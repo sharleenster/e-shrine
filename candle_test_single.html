@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>E-Shrine Candle Test</title>
+  <style>
+    body {
+      background-color: black;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    img {
+      width: 200px; /* adjust size as needed */
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <img id="candle" src="static_candle.png" alt="Candle">
+
+  <script>
+  const candle = document.getElementById('candle');
+  let state = 'off'; // off | lighting | on | extinguishing
+
+  candle.addEventListener('click', () => {
+    if (state === 'off') {
+      candle.src = 'candle_light.gif';   // play lighting animation
+      state = 'lighting';
+      setTimeout(() => {
+        candle.src = 'candle_loop.gif';  // steady flicker
+        state = 'on';
+      }, 3000); // adjust to length of lighting animation
+    } 
+    else if (state === 'on') {
+      candle.src = 'candle_out.gif';     // play extinguish animation
+      state = 'extinguishing';
+      setTimeout(() => {
+        candle.src = 'static_candle.png'; // back to unlit
+        state = 'off';
+      }, 2500); // adjust to length of candle_out.gif
+    }
+  });
+</script>
+
+
+</body>
+</html>

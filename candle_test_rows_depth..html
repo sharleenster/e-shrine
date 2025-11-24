@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>E-Shrine Rows + Depth</title>
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: #000;
+      overflow: hidden;
+      font-family: system-ui, sans-serif;
+    }
+    #stage {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+    }
+    .candle {
+      position: absolute;
+      cursor: pointer;
+      user-select: none;
+      transition: transform .2s ease;
+      will-change: transform, filter, opacity;
+    }
+    .candle:hover { transform: scale(1.06); }
+  </style>
+</head>
+<body>
+  <div id="stage"></div>
+
+  <script>
+    // ---------- knobs ----------
+    const TOTAL_CANDLES = 18;      // total candles
+    const ROWS          = 3;       // number of horizontal bands
+    const EDGE_X        = 80;      // left/right padding
+    const EDGE_Y        = 80;      // top/bottom padding
+    const JITTER_X_PCT  = 0.18;    // horizontal randomness within each slot (0..0.4)
+    const JITTER_Y_PX   = 30;      // vertical wobble inside a row
+    const MIN_W         = 90;      // farthest row candle width (px)
+    const MAX_W         = 160;     // nearest row candle width (px)
+
+    const AUTO_OUT_MS   = 15000;   // steady flicker duration
+    const LIGHT_MS      = 3000;    // candle_light.gif duration
+    const OUT_MS        = 2500;    // candle_out.gif duration
+    // ---------------------------
+
+    const stage = document.getElementById('stage');
+    const stateMap = new WeakMap(); // 'off'|'lighting'|'on'|'extinguishing'
+    const timerMap = new WeakMap(); // auto-out timeout id
+
+    function setAutoTimer(img) {
+      clearAutoTimer(img);
+      const id = setTimeout(() => extinguish(img), AUTO_OUT_MS);
+      timerMap.set(img, id);
+    }
+    function clearAutoTimer(img) {
+      const id = timerMap.get(img);
+      if (id) { clearTimeout(id); timerMap.delete(img); }
+    }
+    function extinguish(img) {
+      if (stateMap.get(img) !== 'on') return;
+      clearAutoTimer(img);
+      img.src = 'candle_out.gif';
+      stateMap.set(img, 'extinguishing');
+      setTimeout(() => {
+        img.src = 'static_candle.png';
+        stateMap.set(img, 'off');
+      }, OUT_MS);
+    }
+
+    function createCandle(x, y, widthPx, depthT) {
+      // depthT: 0 (far) .. 1 (near)
+      const img = document.createElement('img');
+      img.src = 'static_candle.png';
+      img.className = 'candle';
+      img.style.left = `${x}px`;
+      img.style.top  = `${y}px`;
+      img.style.width = `${widthPx}px`;
+
+      // subtle depth cues
+      const blur = (1 - depthT) * 1.5;             // farther = more blur
+      const opacity = 0.7 + depthT * 0.3;          // nearer = more opaque
+      img.style.filter = `blur(${blur}px)`;
+      img.style.opacity = opacity.toFixed(2);
+      img.style.zIndex = String(100 + Math.round(depthT * 100));
+
+      stage.appendChild(img);
+      stateMap.set(img, 'off');
+
+      img.addEventListener('click', () => {
+        const s = stateMap.get(img);
+        if (s === 'off') {
+          img.src = 'candle_light.gif';
+          stateMap.set(img, 'lighting');
+          setTimeout(() => {
+            img.src = 'candle_loop.gif';
+            stateMap.set(img, 'on');
+            setAutoTimer(img);
+          }, LIGHT_MS);
+        } else if (s === 'on') {
+          extinguish(img);
+        }
+      });
+
+      return img;
+    }
+
+    function layoutRowsDepth() {
+      stage.innerHTML = '';
+
+      const W = stage.clientWidth;
+      const H = stage.clientHeight;
+
+      const usableW = Math.max(200, W - EDGE_X * 2);
+      const usableH = Math.max(200, H - EDGE_Y * 2);
+
+      // Distribute candles across rows as evenly as possible
+      const perRow = new Array(ROWS).fill(0);
+      for (let i = 0; i < TOTAL_CANDLES; i++) perRow[i % ROWS]++;
+
+      const rowHeight = usableH / ROWS;
+
+      let idx = 0;
+      for (let r = 0; r < ROWS; r++) {
+        const count = perRow[r];
+        if (!count) continue;
+
+        // depth factor per row: top is far (0), bottom is near (1)
+        const depthT = (r + 0.5) / ROWS;
+        const rowYCenter = EDGE_Y + r * rowHeight + rowHeight / 2;
+
+        for (let c = 0; c < count; c++) {
+          // slot center along X
+          const slotW = usableW / count;
+          const slotCenterX = EDGE_X + c * slotW + slotW / 2;
+
+          // jitter
+          const jitterX = (Math.random() * 2 - 1) * slotW * JITTER_X_PCT;
+          const jitterY = (Math.random() * 2 - 1) * JITTER_Y_PX;
+
+          // width by depth
+          const w = MIN_W + depthT * (MAX_W - MIN_W);
+
+          const x = slotCenterX - w / 2 + jitterX;
+          // raise the image so the flame sits around row center
+          const y = rowYCenter - (w * 1.3) / 2 + jitterY;
+
+          createCandle(x, y, w, depthT);
+          idx++;
+        }
+      }
+    }
+
+    // Optional: reflow on resize (will reset lit states; we can preserve later)
+    let rid = null;
+    window.addEventListener('resize', () => {
+      clearTimeout(rid);
+      rid = setTimeout(layoutRowsDepth, 150);
+    });
+
+    layoutRowsDepth();
+  </script>
+</body>
+</html>

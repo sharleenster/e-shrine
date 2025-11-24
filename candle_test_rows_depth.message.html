@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>E-Shrine Rows + Depth + Message</title>
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: #000;
+      overflow: hidden;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      color: #eee;
+    }
+    #stage {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    /* Candle container (absolute), holds the image + message UI */
+    .candle-wrap {
+      position: absolute;
+      display: inline-block;
+      pointer-events: auto;
+      /* width set inline per-candle */
+    }
+
+    .candle {
+      width: 100%;
+      cursor: pointer;
+      user-select: none;
+      transition: transform .2s ease;
+      will-change: transform, filter, opacity;
+      display: block;
+    }
+    .candle:hover { transform: scale(1.06); }
+
+    /* Message bubble that appears above the flame */
+    .msg {
+      position: absolute;
+      left: 50%;
+      bottom: calc(100% - 8px); /* sit just above the wick area */
+      transform: translateX(-50%);
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255,255,255,0.18);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      padding: 8px 10px;
+      border-radius: 10px;
+      font-size: 14px;
+      line-height: 1.2;
+      max-width: 240px;
+      text-align: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .35s ease;
+      color: #f7f7f7;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.45);
+      white-space: normal;
+      word-wrap: break-word;
+    }
+    .msg.show { opacity: 1; }
+
+    /* Input overlay (appears only when lighting) */
+    .prompt {
+      position: absolute;
+      left: 50%;
+      bottom: calc(100% - 10px);
+      transform: translateX(-50%);
+      display: flex;
+      gap: 6px;
+      background: rgba(0,0,0,0.6);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 12px;
+      padding: 6px;
+      opacity: 0;
+      transition: opacity .2s ease;
+    }
+    .prompt.show { opacity: 1; }
+
+    .prompt input {
+      width: 220px;
+      padding: 6px 8px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.25);
+      background: rgba(20,20,20,0.7);
+      color: #f2f2f2;
+      font-size: 14px;
+      outline: none;
+    }
+    .prompt button {
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.25);
+      background: rgba(255,255,255,0.08);
+      color: #f2f2f2;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .prompt button:hover {
+      background: rgba(255,255,255,0.16);
+    }
+  </style>
+</head>
+<body>
+  <div id="stage"></div>
+
+  <script>
+    // ------------ knobs you can tweak ------------
+    const TOTAL_CANDLES = 18;      // total candles
+    const ROWS          = 3;       // horizontal bands (like your comps)
+    const EDGE_X        = 80;      // left/right padding
+    const EDGE_Y        = 80;      // top/bottom padding
+    const JITTER_X_PCT  = 0.18;    // horizontal randomness within each slot (0..0.4)
+    const JITTER_Y_PX   = 30;      // vertical wobble inside a row
+    const MIN_W         = 90;      // far row width (px)
+    const MAX_W         = 160;     // near row width (px)
+
+    const AUTO_OUT_MS   = 15000;   // steady flicker duration after lighting
+    const LIGHT_MS      = 3000;    // candle_light.gif duration (ms)
+    const OUT_MS        = 2500;    // candle_out.gif duration (ms)
+
+    const MESSAGE_MAX_CHARS = 30;  // limit like your spec
+    const MESSAGE_VIS_MS    = 4500; // how long message stays visible before fade
+    // ---------------------------------------------
+
+    const stage = document.getElementById('stage');
+
+    // Per-candle state + timers
+    const stateMap  = new WeakMap(); // 'off'|'lighting'|'on'|'extinguishing'
+    const autoMap   = new WeakMap(); // auto-out timeout id
+    const msgMap    = new WeakMap(); // message visibility timeout id
+
+    function clearAutoTimer(node) {
+      const id = autoMap.get(node);
+      if (id) { clearTimeout(id); autoMap.delete(node); }
+    }
+    function setAutoTimer(node) {
+      clearAutoTimer(node);
+      const id = setTimeout(() => extinguish(node), AUTO_OUT_MS);
+      autoMap.set(node, id);
+    }
+
+    function showMessage(node, text) {
+      const { msgEl } = node.__ui;
+      if (!msgEl) return;
+
+      // clean previous timer if any
+      const prior = msgMap.get(node);
+      if (prior) { clearTimeout(prior); msgMap.delete(node); }
+
+      msgEl.textContent = text;
+      msgEl.classList.add('show');
+      const tid = setTimeout(() => {
+        msgEl.classList.remove('show');
+        msgMap.delete(node);
+      }, MESSAGE_VIS_MS);
+      msgMap.set(node, tid);
+    }
+
+    function hidePrompt(node) {
+      const { promptEl } = node.__ui || {};
+      if (promptEl) promptEl.classList.remove('show');
+    }
+    function showPrompt(node) {
+      const { promptEl, inputEl } = node.__ui;
+      if (!promptEl) return;
+      promptEl.classList.add('show');
+      // focus shortly after to ensure DOM is painted
+      setTimeout(() => inputEl && inputEl.focus(), 0);
+    }
+
+    function extinguish(node) {
+      const { imgEl } = node.__ui;
+      const s = stateMap.get(node);
+      if (s !== 'on') return;
+
+      clearAutoTimer(node);
+      hidePrompt(node);
+
+      imgEl.src = 'candle_out.gif';
+      stateMap.set(node, 'extinguishing');
+      setTimeout(() => {
+        imgEl.src = 'static_candle.png';
+        stateMap.set(node, 'off');
+      }, OUT_MS);
+    }
+
+    function createCandle(x, y, widthPx, depthT) {
+      // wrapper so we can position message relative to the candle
+      const wrap = document.createElement('div');
+      wrap.className = 'candle-wrap';
+      wrap.style.left = `${x}px`;
+      wrap.style.top  = `${y}px`;
+      wrap.style.width = `${widthPx}px`;
+      stage.appendChild(wrap);
+
+      // the candle image
+      const img = document.createElement('img');
+      img.className = 'candle';
+      img.src = 'static_candle.png';
+      // depth cues
+      const blur = (1 - depthT) * 1.5;
+      const opacity = 0.7 + depthT * 0.3;
+      img.style.filter = `blur(${blur}px)`;
+      img.style.opacity = opacity.toFixed(2);
+      img.style.zIndex = String(100 + Math.round(depthT * 100));
+      wrap.appendChild(img);
+
+      // message bubble (hidden by default)
+      const msg = document.createElement('div');
+      msg.className = 'msg';
+      wrap.appendChild(msg);
+
+      // input prompt (shows right after lighting)
+      const prompt = document.createElement('div');
+      prompt.className = 'prompt';
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.placeholder = 'Add a short message…';
+      input.maxLength = MESSAGE_MAX_CHARS;
+      const btn = document.createElement('button');
+      btn.textContent = 'Submit';
+      prompt.appendChild(input);
+      prompt.appendChild(btn);
+      wrap.appendChild(prompt);
+
+      // store UI refs on wrapper
+      wrap.__ui = { imgEl: img, msgEl: msg, promptEl: prompt, inputEl: input, btnEl: btn };
+
+      // interaction
+      stateMap.set(wrap, 'off');
+
+      img.addEventListener('click', () => {
+        const s = stateMap.get(wrap);
+
+        if (s === 'off') {
+          // light → after LIGHT_MS switch to loop + show prompt
+          img.src = 'candle_light.gif';
+          stateMap.set(wrap, 'lighting');
+          hidePrompt(wrap);
+          setTimeout(() => {
+            img.src = 'candle_loop.gif';
+            stateMap.set(wrap, 'on');
+            setAutoTimer(wrap);
+            showPrompt(wrap); // show message input after candle is lit
+          }, LIGHT_MS);
+        } else if (s === 'on') {
+          extinguish(wrap); // allow click to extinguish early
+        }
+        // ignore clicks during lighting/extinguishing
+      });
+
+      // submit message
+      btn.addEventListener('click', () => {
+        const s = stateMap.get(wrap);
+        if (s !== 'on') return;
+        const text = (input.value || '').trim();
+        hidePrompt(wrap);
+        if (text) showMessage(wrap, text);
+        input.value = '';
+      });
+
+      // also submit on Enter
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') btn.click();
+      });
+
+      return wrap;
+    }
+
+    function layoutRowsDepth() {
+      stage.innerHTML = '';
+
+      const W = stage.clientWidth;
+      const H = stage.clientHeight;
+      const usableW = Math.max(200, W - EDGE_X * 2);
+      const usableH = Math.max(200, H - EDGE_Y * 2);
+
+      // distribute candles across rows
+      const perRow = new Array(ROWS).fill(0);
+      for (let i = 0; i < TOTAL_CANDLES; i++) perRow[i % ROWS]++;
+
+      const rowH = usableH / ROWS;
+
+      for (let r = 0; r < ROWS; r++) {
+        const count = perRow[r];
+        if (!count) continue;
+
+        // depth: top far (0), bottom near (1)
+        const depthT = (r + 0.5) / ROWS;
+        const rowYCenter = EDGE_Y + r * rowH + rowH / 2;
+
+        for (let c = 0; c < count; c++) {
+          const slotW = usableW / count;
+          const slotCenterX = EDGE_X + c * slotW + slotW / 2;
+
+          const jitterX = (Math.random() * 2 - 1) * slotW * JITTER_X_PCT;
+          const jitterY = (Math.random() * 2 - 1) * JITTER_Y_PX;
+
+          // width by depth
+          const w = MIN_W + depthT * (MAX_W - MIN_W);
+
+          const x = slotCenterX - w / 2 + jitterX;
+          // lift so wick/flame sits near row center (heuristic factor 1.3)
+          const y = rowYCenter - (w * 1.3) / 2 + jitterY;
+
+          createCandle(x, y, w, depthT);
+        }
+      }
+    }
+
+    // Optional: reflow on resize (resets scene; preserving state can be added later)
+    let rid = null;
+    window.addEventListener('resize', () => {
+      clearTimeout(rid);
+      rid = setTimeout(layoutRowsDepth, 150);
+    });
+
+    layoutRowsDepth();
+  </script>
+</body>
+</html>

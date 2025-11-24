@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>E-Shrine Multi-Candle Test</title>
+  <style>
+    body {
+      background-color: black;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .candle-container {
+      display: flex;
+      gap: 60px; /* space between candles */
+    }
+
+    .candle {
+      width: 150px;
+      cursor: pointer;
+      user-select: none;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="candle-container">
+    <img src="static_candle.png" alt="Candle" class="candle">
+    <img src="static_candle.png" alt="Candle" class="candle">
+    <img src="static_candle.png" alt="Candle" class="candle">
+  </div>
+
+  <script>
+    const candles = document.querySelectorAll('.candle');
+
+    candles.forEach((candle) => {
+      let state = 'off'; // can be off | lighting | on | extinguishing
+
+      candle.addEventListener('click', () => {
+        if (state === 'off') {
+          candle.src = 'candle_light.gif';
+          state = 'lighting';
+          setTimeout(() => {
+            candle.src = 'candle_loop.gif';
+            state = 'on';
+          }, 3000); // adjust to length of candle_light.gif
+        } 
+        else if (state === 'on') {
+          candle.src = 'candle_out.gif';
+          state = 'extinguishing';
+          setTimeout(() => {
+            candle.src = 'static_candle.png';
+            state = 'off';
+          }, 2500); // adjust to length of candle_out.gif
+        }
+      });
+    });
+  </script>
+</body>
+</html>
