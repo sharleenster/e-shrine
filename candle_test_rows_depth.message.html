@@ -179,10 +179,10 @@
       clearAutoTimer(node);
       hidePrompt(node);
 
-      imgEl.src = 'candle_out.gif';
+      imgEl.src = 'assets/images/candle_out.gif';
       stateMap.set(node, 'extinguishing');
       setTimeout(() => {
-        imgEl.src = 'static_candle.png';
+        imgEl.src = 'assets/images/static_candle.png';
         stateMap.set(node, 'off');
       }, OUT_MS);
     }
@@ -199,7 +199,7 @@
       // the candle image
       const img = document.createElement('img');
       img.className = 'candle';
-      img.src = 'static_candle.png';
+      img.src = 'assets/images/static_candle.png';
       // depth cues
       const blur = (1 - depthT) * 1.5;
       const opacity = 0.7 + depthT * 0.3;
@@ -237,11 +237,11 @@
 
         if (s === 'off') {
           // light → after LIGHT_MS switch to loop + show prompt
-          img.src = 'candle_light.gif';
+          img.src = 'assets/images/candle_light.gif';
           stateMap.set(wrap, 'lighting');
           hidePrompt(wrap);
           setTimeout(() => {
-            img.src = 'candle_loop.gif';
+            img.src = 'assets/images/candle_loop.gif';
             stateMap.set(wrap, 'on');
             setAutoTimer(wrap);
             showPrompt(wrap); // show message input after candle is lit
