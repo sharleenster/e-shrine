@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>E-Shrine</title>
+  <title>E-Shrine – Entry</title>
   <style>
     html, body {
       margin: 0;
@@ -18,17 +18,13 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      opacity: 0;                    /* start transparent */
-      transition: opacity 0.9s ease; /* fade in / out */
+      opacity: 0;
+      transition: opacity 0.9s ease;
       position: relative;
     }
 
     body.ready {
-      opacity: 1;                    /* fade in when ready */
-    }
-
-    body.fade-out {
-      opacity: 0;                    /* fade out on leaving */
+      opacity: 1;
     }
 
     /* soft vignette */
@@ -50,17 +46,16 @@
     }
 
     .candle-wrapper {
-      width: 200px;
-      max-width: 50vw;
-      margin: 0 auto 32px auto;
-      cursor: pointer;
+      width: 220px;
+      max-width: 55vw;
+      margin: 0 auto 40px auto;
+      cursor: default;
     }
 
     .candle-wrapper img {
       display: block;
       width: 100%;
       height: auto;
-      /* subtle flicker / breathing */
       animation: candle-flicker 2.4s ease-in-out infinite;
       transform-origin: 50% 100%;
     }
@@ -74,75 +69,88 @@
       100% { transform: scale(1);     filter: brightness(1); }
     }
 
-    .enter-link {
-      font-size: 18px;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
+    /* Bottom bar – matches shrine_tiered style */
+    #bottom-bar {
+      position: fixed;
+      left: 50%;
+      bottom: 18px;
+      transform: translateX(-50%);
+      width: min(70vw, 640px);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 10px;
+      background: rgba(0,0,0,0.8);
+      border-radius: 4px;
+      border: 1px solid rgba(255,255,255,0.35);
+      box-shadow: 0 8px 25px rgba(0,0,0,0.7);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
       cursor: pointer;
-      display: inline-block;
-      padding: 10px 28px;
-      border-radius: 999px;
-      border: 1px solid rgba(255, 255, 255, 0.35);
-      background: rgba(255, 255, 255, 0.04);
-      text-decoration: none;
-      color: #f5f5f5;
-      transition:
-        background 0.25s ease,
-        transform 0.25s ease,
-        border-color 0.25s ease,
-        letter-spacing 0.25s ease,
-        box-shadow 0.25s ease;
-      box-shadow: 0 0 0 rgba(0,0,0,0);
+      z-index: 200;
     }
 
-    .enter-link:hover {
-      background: rgba(255, 255, 255, 0.12);
-      border-color: rgba(255, 255, 255, 0.7);
-      transform: translateY(-2px);
-      letter-spacing: 0.12em;
-      box-shadow: 0 0 12px rgba(255,255,255,0.18);
+    #entry-text {
+      flex: 1;
+      font-size: 14px;
+      color: rgba(230,230,230,0.9);
+      text-align: left;
+      padding: 4px 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
-    .enter-link:active {
-      transform: translateY(0);
-      box-shadow: 0 0 4px rgba(255,255,255,0.12);
+    #entry-arrow {
+      font-size: 18px;
+      padding: 0 8px;
+    }
+
+    #bottom-bar:focus-visible {
+      outline: 2px solid rgba(255,255,255,0.9);
+      outline-offset: 2px;
     }
   </style>
 </head>
 <body>
   <div class="shell">
-    <div class="candle-wrapper" id="candle-wrapper">
+    <div class="candle-wrapper">
       <img src="assets/images/candle_loop.gif" alt="Looping candle">
     </div>
+  </div>
 
-    <a href="candle_test_rows_depth.message.html"
-       class="enter-link"
-       id="enter-link">
-      LIGHT A CANDLE
-    </a>
+  <div id="bottom-bar" tabindex="0">
+    <div id="entry-text">Light a candle</div>
+    <div id="entry-arrow">→</div>
   </div>
 
   <script>
-    const targetUrl = 'candle_test_rows_depth.message.html';
-    const link = document.getElementById('enter-link');
-    const candle = document.getElementById('candle-wrapper');
+    const SHRINE_PAGE = 'shrine_tiered.html';
+    const bottomBar   = document.getElementById('bottom-bar');
 
-    function goToShrine(event) {
-      if (event) event.preventDefault();
-      document.body.classList.add('fade-out');
-      setTimeout(function () {
-        window.location.href = targetUrl;
-      }, 900); // match CSS transition
+    function goToShrine() {
+      document.body.style.transition = 'opacity 0.9s ease';
+      document.body.style.opacity = '0';
+      setTimeout(() => {
+        window.location.href = SHRINE_PAGE;
+      }, 900);
     }
 
-    // fade in when page is ready
-    window.addEventListener('load', function () {
-      document.body.classList.add('ready');
+    // click on bar
+    bottomBar.addEventListener('click', goToShrine);
+
+    // Enter / Space while bar is focused
+    bottomBar.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        goToShrine();
+      }
     });
 
-    // clicking either the text or the candle triggers transition
-    link.addEventListener('click', goToShrine);
-    candle.addEventListener('click', goToShrine);
+    // fade in on load
+    window.addEventListener('load', () => {
+      document.body.classList.add('ready');
+    });
   </script>
 </body>
 </html>

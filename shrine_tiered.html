@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>E-Shrine – Tiered Candles</title>
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: #000;
+      overflow: hidden;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      color: #eee;
+    }
+
+    #stage {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    .candle-wrap {
+      position: absolute;
+      display: inline-block;
+      pointer-events: auto;
+    }
+
+    .candle {
+      width: 100%;
+      cursor: pointer;
+      user-select: none;
+      transition: transform .2s ease;
+      will-change: transform, filter, opacity;
+      display: block;
+    }
+    .candle:hover { transform: scale(1.03); }
+
+    /* Whisper text – always above candles */
+    .msg {
+      position: absolute;
+      left: 50%;
+      bottom: calc(100% - 8px);
+      transform: translateX(-50%);
+      font-size: 13px;
+      line-height: 1.2;
+      text-align: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .35s ease;
+      color: #cac6c6 !important;  /* light grey whisper */
+      white-space: nowrap;
+      max-width: 320px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-shadow: 0 0 4px rgba(0,0,0,0.85);
+      z-index: 1000;
+    }
+    .msg.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+    .msg.smoke-out {
+      animation: msgSmoke 1.8s ease-out forwards;
+    }
+
+    @keyframes msgSmoke {
+      0% {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+      100% {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-22px);
+      }
+    }
+
+    /* Bottom input bar – matches index.html, rectangular with subtle rounding */
+    #bottom-bar {
+      position: fixed;
+      left: 50%;
+      bottom: 18px;
+      transform: translateX(-50%);
+      width: min(70vw, 640px);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 10px;
+      background: rgba(0,0,0,0.8);
+      border-radius: 4px;
+      border: 1px solid rgba(255,255,255,0.35);
+      box-shadow: 0 8px 25px rgba(0,0,0,0.7);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      z-index: 200;
+    }
+
+    #wish-input {
+      flex: 1;
+      border: none;
+      outline: none;
+      background: transparent;
+      color: #f5f5f5;
+      font-size: 14px;
+      padding: 4px 2px;
+    }
+
+    /* Instructional feel: grey + italic */
+    #wish-input::placeholder {
+      color: #cac6c6;
+      font-style: italic;
+    }
+
+    #wish-input:disabled {
+      color: rgba(200,200,200,0.4);
+    }
+
+    /* Back arrow inside bar (right) – no circle, matches index arrow */
+    #back-arrow {
+      font-size: 18px;
+      color: rgba(255,255,255,0.7);
+      cursor: pointer;
+      padding: 0 6px;
+      box-shadow: 0 0 0 rgba(255,255,255,0);
+      transition:
+        color 0.2s ease,
+        background 0.2s ease,
+        box-shadow 0.25s ease,
+        transform 0.2s ease;
+      margin-left: 8px;
+      flex-shrink: 0;
+    }
+
+    #back-arrow:hover {
+      color: #ffffff;
+      box-shadow: 0 0 14px rgba(255,255,255,0.45); /* soft glow */
+      transform: translateY(-1px);
+    }
+  </style>
+</head>
+<body>
+  <div id="stage"></div>
+
+  <!-- Input bar with back arrow inside (right) -->
+  <div id="bottom-bar">
+    <input
+      id="wish-input"
+      type="text"
+      maxlength="80"
+      placeholder="Click a candle to light it and leave a wish/thought/prayer."
+      disabled
+    />
+    <div id="back-arrow">←</div>
+  </div>
+
+  <script>
+    // ------------ layout & timing knobs ------------
+    const PER_ROW_COUNTS = [12, 12, 12];
+    const ROWS           = PER_ROW_COUNTS.length;
+
+    const EDGE_X        = 80;
+    const EDGE_Y_TOP    = 60;
+    const BOTTOM_GUTTER = 200;
+
+    const JITTER_X_PCT  = 0.03;
+    const JITTER_Y_PX   = 4;
+
+    // Bigger candles overall
+    const MIN_W         = 100;  // far row
+    const MAX_W         = 150;  // near row
+
+    const AUTO_OUT_MS       = 60000;
+    const LIGHT_MS          = 3000;
+    const OUT_MS            = 2500;
+    const MESSAGE_MAX_CHARS = 80;
+    const MESSAGE_VIS_MS    = 20000;
+
+    const ENTRY_PAGE = 'index.html';
+
+    const stage     = document.getElementById('stage');
+    const wishInput = document.getElementById('wish-input');
+    const backArrow = document.getElementById('back-arrow');
+
+    const stateMap  = new WeakMap();
+    const autoMap   = new WeakMap();
+    const msgMap    = new WeakMap();
+
+    let activeCandle = null;
+
+    function clearAutoTimer(node) {
+      const id = autoMap.get(node);
+      if (id) { clearTimeout(id); autoMap.delete(node); }
+    }
+
+    function setAutoTimer(node) {
+      clearAutoTimer(node);
+      const id = setTimeout(() => extinguish(node), AUTO_OUT_MS);
+      autoMap.set(node, id);
+    }
+
+    function clearMessage(node) {
+      const { msgEl } = node.__ui || {};
+      if (!msgEl) return;
+      const prior = msgMap.get(node);
+      if (prior) { clearTimeout(prior); msgMap.delete(node); }
+      msgEl.classList.remove('show', 'smoke-out');
+      msgEl.textContent = '';
+    }
+
+    function showMessage(node, text) {
+      const { msgEl } = node.__ui;
+      if (!msgEl) return;
+
+      const trimmed = (text || '').trim().slice(0, MESSAGE_MAX_CHARS);
+      if (!trimmed) return;
+
+      clearMessage(node);
+
+      msgEl.textContent = trimmed;
+      msgEl.classList.add('show');
+
+      const stayId = setTimeout(() => {
+        msgEl.classList.add('smoke-out');
+
+        const ANIM_MS = 1800;
+        const finishId = setTimeout(() => {
+          msgEl.classList.remove('show', 'smoke-out');
+          msgEl.textContent = '';
+          msgMap.delete(node);
+        }, ANIM_MS);
+
+        msgMap.set(node, finishId);
+      }, MESSAGE_VIS_MS);
+
+      msgMap.set(node, stayId);
+    }
+
+    function resetInputToIdle() {
+      wishInput.value = '';
+      wishInput.disabled = true;
+      wishInput.placeholder = 'Click a candle to light it and leave a wish/thought/prayer.';
+    }
+
+    function enableInputForActive() {
+      wishInput.disabled = false;
+      wishInput.value = '';
+      wishInput.placeholder = 'Type your wish/thought/prayer and press Enter to send.';
+      wishInput.focus();
+    }
+
+    function extinguish(node) {
+      const { imgEl } = node.__ui;
+      const s = stateMap.get(node);
+      if (s !== 'on') return;
+
+      clearAutoTimer(node);
+      clearMessage(node);
+
+      imgEl.src = 'assets/images/candle_out.gif';
+      stateMap.set(node, 'extinguishing');
+
+      resetInputToIdle();
+
+      setTimeout(() => {
+        imgEl.src = 'assets/images/static_candle.png';
+        stateMap.set(node, 'off');
+        if (activeCandle === node) activeCandle = null;
+      }, OUT_MS);
+    }
+
+    function createCandle(x, y, widthPx, depthT, isBottomRow) {
+      const wrap = document.createElement('div');
+      wrap.className = 'candle-wrap';
+      wrap.style.left = `${x}px`;
+      wrap.style.top  = `${y}px`;
+      wrap.style.width = `${widthPx}px`;
+      stage.appendChild(wrap);
+
+      const img = document.createElement('img');
+      img.className = 'candle';
+      img.src = 'assets/images/static_candle.png';
+
+      const blur    = (1 - depthT) * 1.4;
+      const opacity = 0.72 + depthT * 0.28;
+      img.style.filter  = `blur(${blur}px)`;
+      img.style.opacity = opacity.toFixed(2);
+      wrap.appendChild(img);
+
+      const msg = document.createElement('div');
+      msg.className = 'msg';
+      wrap.appendChild(msg);
+
+      wrap.__ui = { imgEl: img, msgEl: msg };
+      stateMap.set(wrap, 'off');
+
+      img.addEventListener('click', () => {
+        const s = stateMap.get(wrap);
+
+        // only one active candle
+        if (activeCandle && activeCandle !== wrap) return;
+
+        if (s === 'off') {
+          activeCandle = wrap;
+          clearMessage(wrap);
+          resetInputToIdle();
+
+          img.src = 'assets/images/candle_light.gif';
+          stateMap.set(wrap, 'lighting');
+          wishInput.disabled = true;
+
+          setTimeout(() => {
+            img.src = 'assets/images/candle_loop.gif';
+            stateMap.set(wrap, 'on');
+            setAutoTimer(wrap);
+            enableInputForActive();
+          }, LIGHT_MS);
+        } else if (s === 'on') {
+          extinguish(wrap);
+        }
+      });
+
+      return wrap;
+    }
+
+    function layoutRowsDepth() {
+      stage.innerHTML = '';
+      activeCandle = null;
+      resetInputToIdle();
+
+      const W = stage.clientWidth;
+      const H = stage.clientHeight;
+
+      const usableH = Math.max(240, H - EDGE_Y_TOP - BOTTOM_GUTTER);
+      const usableW = Math.max(300, W - EDGE_X * 2);
+
+      const rowPositionsT = [0.2, 0.52, 0.84];
+
+      for (let r = 0; r < ROWS; r++) {
+        const count = PER_ROW_COUNTS[r];
+        if (!count) continue;
+
+        const depthT = (r + 0.6) / ROWS;
+        const rowYCenter = EDGE_Y_TOP + rowPositionsT[r] * usableH;
+        const slotW = usableW / count;
+
+        for (let c = 0; c < count; c++) {
+          const baseCenterX = EDGE_X + c * slotW + slotW / 2;
+
+          const jitterX = (Math.random() * 2 - 1) * slotW * JITTER_X_PCT;
+          const jitterY = (Math.random() * 2 - 1) * JITTER_Y_PX;
+
+          const baseW = MIN_W + depthT * (MAX_W - MIN_W);
+          const rowScale = (r === ROWS - 1) ? 1.25 : 1.0;
+          const w = Math.min(baseW * rowScale, slotW * 0.9);
+
+          const x = baseCenterX - w / 2 + jitterX;
+          const y = rowYCenter - (w * 1.1) / 2 + jitterY;
+
+          createCandle(x, y, w, depthT, r === ROWS - 1);
+        }
+      }
+    }
+
+    layoutRowsDepth();
+
+    // Enter to send wish
+    wishInput.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+
+      const text = (wishInput.value || '').trim();
+      if (!text) return;
+      if (!activeCandle) return;
+
+      const s = stateMap.get(activeCandle);
+      if (s !== 'on') return;
+
+      showMessage(activeCandle, text);
+      wishInput.value = '';
+    });
+
+    // Back arrow → entry page
+    if (backArrow) {
+      backArrow.addEventListener('click', () => {
+        document.body.style.transition = 'opacity 0.9s ease';
+        document.body.style.opacity = '0';
+        setTimeout(() => {
+          window.location.href = ENTRY_PAGE;
+        }, 900);
+      });
+    }
+  </script>
+</body>
+</html>
