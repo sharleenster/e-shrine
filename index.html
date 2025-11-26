@@ -75,12 +75,13 @@
       100% { transform: scale(1);     filter: brightness(1); }
     }
 
-    /* Mobile blocking message */
+    /* Mobile blocking message – now BELOW the candle */
     #mobile-message {
       position: absolute;
-      top: -40px;
+      top: 100%;
       left: 50%;
       transform: translateX(-50%);
+      margin-top: 12px;
       font-size: 14px;
       color: #cac6c6;
       text-align: center;
@@ -91,26 +92,11 @@
       opacity: 0;
       pointer-events: none;
       text-shadow: 0 0 4px rgba(0,0,0,0.85);
+      transition: opacity 0.6s ease;
     }
 
     .msg-show {
       opacity: 1;
-      transition: opacity 0.3s ease;
-    }
-
-    .msg-smoke-out {
-      animation: mobileSmoke 1.8s ease-out forwards;
-    }
-
-    @keyframes mobileSmoke {
-      0% {
-        opacity: 1;
-        transform: translate(-50%, 0);
-      }
-      100% {
-        opacity: 0;
-        transform: translate(-50%, -18px);
-      }
     }
 
     /* Shared bottom bar base (desktop only) */
@@ -175,8 +161,8 @@
 <body>
   <div class="shell">
     <div class="candle-wrapper">
-      <div id="mobile-message"></div>
       <img id="entry-candle" src="assets/images/candle_loop.gif" alt="Candle">
+      <div id="mobile-message"></div>
     </div>
   </div>
 
@@ -192,7 +178,7 @@
     const desktopBar    = document.getElementById('desktop-bar');
     const mobileMessage = document.getElementById('mobile-message');
 
-    const MESSAGE_VIS_MS = 10000; // 10 seconds per line
+    const MESSAGE_VIS_MS = 20000; // 10 seconds per line
 
     function isMobile() {
       return window.innerWidth <= 768;
@@ -248,22 +234,22 @@
       function showNext() {
         const text = messages[index];
         mobileMessage.textContent = text;
-        mobileMessage.classList.remove('msg-smoke-out');
+
+        // fade in
         mobileMessage.classList.add('msg-show');
 
         if (index < messages.length - 1) {
-          // For first two messages: hold, then smoke-fade and move on
+          // First two lines: hold, then fade out, then next
           setTimeout(() => {
-            mobileMessage.classList.add('msg-smoke-out');
-            const ANIM_MS = 1800;
+            mobileMessage.classList.remove('msg-show'); // fade out
+            const FADE_MS = 600;
             setTimeout(() => {
-              mobileMessage.classList.remove('msg-show', 'msg-smoke-out');
               index += 1;
               showNext();
-            }, ANIM_MS);
+            }, FADE_MS);
           }, MESSAGE_VIS_MS);
         } else {
-          // Last message stays
+          // Last message stays visible
         }
       }
 
@@ -288,8 +274,6 @@
     } else {
       setupDesktop();
     }
-
-    // (Optional: in future, we could listen for resize and switch modes, but not needed for v1.)
   </script>
 </body>
 </html>
