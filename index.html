@@ -75,24 +75,22 @@
       100% { transform: scale(1);     filter: brightness(1); }
     }
 
-    /* Mobile blocking message – now BELOW the candle */
+    /* Mobile blocking message – fixed near bottom, always visible */
     #mobile-message {
-      position: absolute;
-      top: 100%;
+      position: fixed;
       left: 50%;
+      bottom: 40px;
       transform: translateX(-50%);
-      margin-top: 12px;
       font-size: 14px;
       color: #cac6c6;
       text-align: center;
-      white-space: nowrap;
-      max-width: 260px;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      max-width: 80vw;
+      line-height: 1.4;
       opacity: 0;
       pointer-events: none;
       text-shadow: 0 0 4px rgba(0,0,0,0.85);
       transition: opacity 0.6s ease;
+      z-index: 50;
     }
 
     .msg-show {
@@ -162,9 +160,11 @@
   <div class="shell">
     <div class="candle-wrapper">
       <img id="entry-candle" src="assets/images/candle_loop.gif" alt="Candle">
-      <div id="mobile-message"></div>
     </div>
   </div>
+
+  <!-- Mobile message container -->
+  <div id="mobile-message"></div>
 
   <!-- Desktop bar: navigate to shrine -->
   <div id="desktop-bar" class="bottom-bar" tabindex="0">
@@ -178,7 +178,7 @@
     const desktopBar    = document.getElementById('desktop-bar');
     const mobileMessage = document.getElementById('mobile-message');
 
-    const MESSAGE_VIS_MS = 20000; // 10 seconds per line
+    const MESSAGE_VIS_MS = 20000; // time each message stays fully visible
 
     function isMobile() {
       return window.innerWidth <= 768;
