@@ -75,10 +75,10 @@
       100% { transform: scale(1);     filter: brightness(1); }
     }
 
-    /* Whisper text for mobile */
-    #mobile-whisper {
+    /* Mobile blocking message */
+    #mobile-message {
       position: absolute;
-      top: -34px;
+      top: -40px;
       left: 50%;
       transform: translateX(-50%);
       font-size: 14px;
@@ -93,12 +93,12 @@
       text-shadow: 0 0 4px rgba(0,0,0,0.85);
     }
 
-    .whisper-show {
+    .msg-show {
       opacity: 1;
       transition: opacity 0.3s ease;
     }
 
-    .whisper-smoke-out {
+    .msg-smoke-out {
       animation: mobileSmoke 1.8s ease-out forwards;
     }
 
@@ -113,7 +113,7 @@
       }
     }
 
-    /* Shared bottom bar base */
+    /* Shared bottom bar base (desktop only) */
     .bottom-bar {
       position: fixed;
       left: 50%;
@@ -170,73 +170,29 @@
       outline: 2px solid rgba(255,255,255,0.9);
       outline-offset: 2px;
     }
-
-    /* Mobile bar: input only */
-    #mobile-bar {
-      display: none; /* default hidden, enabled in JS if mobile */
-    }
-
-    #mobile-input {
-      flex: 1;
-      border: none;
-      outline: none;
-      background: transparent;
-      color: #f5f5f5;
-      font-size: 14px;
-      padding: 4px 2px;
-    }
-
-    #mobile-input::placeholder {
-      color: #cac6c6;
-      font-style: italic;
-    }
-
-    #mobile-input:disabled {
-      color: rgba(200,200,200,0.4);
-    }
   </style>
 </head>
 <body>
   <div class="shell">
     <div class="candle-wrapper">
-      <div id="mobile-whisper"></div>
+      <div id="mobile-message"></div>
       <img id="entry-candle" src="assets/images/candle_loop.gif" alt="Candle">
     </div>
   </div>
 
   <!-- Desktop bar: navigate to shrine -->
   <div id="desktop-bar" class="bottom-bar" tabindex="0">
-    <div id="entry-text">Light a candle and enter the shrine.</div>
+    <div id="entry-text">Enter the shrine to light a candle.</div>
     <div id="entry-arrow">→</div>
   </div>
 
-  <!-- Mobile bar: whisper input -->
-  <div id="mobile-bar" class="bottom-bar">
-    <input
-      id="mobile-input"
-      type="text"
-      maxlength="80"
-      placeholder="Tap the candle to light it, then type your wish and press Enter."
-      disabled
-    />
-  </div>
-
   <script>
-    const SHRINE_PAGE = 'shrine_tiered.html';
-    const entryCandle = document.getElementById('entry-candle');
-    const desktopBar  = document.getElementById('desktop-bar');
-    const mobileBar   = document.getElementById('mobile-bar');
-    const mobileInput = document.getElementById('mobile-input');
-    const mobileWhisper = document.getElementById('mobile-whisper');
+    const SHRINE_PAGE   = 'shrine_tiered.html';
+    const entryCandle   = document.getElementById('entry-candle');
+    const desktopBar    = document.getElementById('desktop-bar');
+    const mobileMessage = document.getElementById('mobile-message');
 
-    const LIGHT_MS = 3000;
-    const OUT_MS   = 2500;
-    const AUTO_OUT_MS = 60000;
-    const MESSAGE_VIS_MS = 20000;
-
-    let candleState = 'off'; // for mobile: 'off' | 'lighting' | 'on' | 'extinguishing'
-    let autoTimer   = null;
-    let msgTimer    = null;
+    const MESSAGE_VIS_MS = 10000; // 10 seconds per line
 
     function isMobile() {
       return window.innerWidth <= 768;
@@ -252,11 +208,11 @@
     function setupDesktop() {
       document.body.classList.add('desktop');
 
-      // candle loop for desktop
       entryCandle.src = 'assets/images/candle_loop.gif';
 
       desktopBar.style.display = 'flex';
-      mobileBar.style.display = 'none';
+      mobileMessage.textContent = '';
+      mobileMessage.className = '';
 
       function goToShrine() {
         document.body.style.transition = 'opacity 0.9s ease';
@@ -277,115 +233,52 @@
       fadeInBody();
     }
 
-    // ---------- Mobile setup ----------
-    function clearAuto() {
-      if (autoTimer) {
-        clearTimeout(autoTimer);
-        autoTimer = null;
+    // ---------- Mobile setup (block shrine access) ----------
+    function showMobileSequence() {
+      if (!mobileMessage) return;
+
+      const messages = [
+        "The shrine cannot be entered from a mobile device.",
+        "Enjoy the flame while you’re here.",
+        "Shared flames, private whispers."
+      ];
+
+      let index = 0;
+
+      function showNext() {
+        const text = messages[index];
+        mobileMessage.textContent = text;
+        mobileMessage.classList.remove('msg-smoke-out');
+        mobileMessage.classList.add('msg-show');
+
+        if (index < messages.length - 1) {
+          // For first two messages: hold, then smoke-fade and move on
+          setTimeout(() => {
+            mobileMessage.classList.add('msg-smoke-out');
+            const ANIM_MS = 1800;
+            setTimeout(() => {
+              mobileMessage.classList.remove('msg-show', 'msg-smoke-out');
+              index += 1;
+              showNext();
+            }, ANIM_MS);
+          }, MESSAGE_VIS_MS);
+        } else {
+          // Last message stays
+        }
       }
-    }
 
-    function clearMessage() {
-      if (!mobileWhisper) return;
-      if (msgTimer) {
-        clearTimeout(msgTimer);
-        msgTimer = null;
-      }
-      mobileWhisper.classList.remove('whisper-show', 'whisper-smoke-out');
-      mobileWhisper.textContent = '';
-    }
-
-    function showMobileWhisper(text) {
-      if (!mobileWhisper) return;
-
-      const trimmed = (text || '').trim();
-      if (!trimmed) return;
-
-      clearMessage();
-      mobileWhisper.textContent = trimmed;
-      mobileWhisper.classList.add('whisper-show');
-
-      msgTimer = setTimeout(() => {
-        mobileWhisper.classList.add('whisper-smoke-out');
-        const ANIM_MS = 1800;
-        msgTimer = setTimeout(() => {
-          mobileWhisper.classList.remove('whisper-show', 'whisper-smoke-out');
-          mobileWhisper.textContent = '';
-          msgTimer = null;
-        }, ANIM_MS);
-      }, MESSAGE_VIS_MS);
-    }
-
-    function extinguishMobile() {
-      if (candleState !== 'on') return;
-      candleState = 'extinguishing';
-      clearAuto();
-      // optional: let whisper fade naturally
-
-      entryCandle.src = 'assets/images/candle_out.gif';
-      mobileInput.disabled = true;
-      mobileInput.placeholder = 'The flame is fading.';
-
-      setTimeout(() => {
-        entryCandle.src = 'assets/images/static_candle.png';
-        candleState = 'off';
-        mobileInput.placeholder = 'Tap the candle to light it, then type your wish and press Enter.';
-      }, OUT_MS);
+      showNext();
     }
 
     function setupMobile() {
       document.body.classList.add('mobile');
+      document.body.classList.remove('desktop');
 
-      // start with unlit candle
-      entryCandle.src = 'assets/images/static_candle.png';
-      document.body.classList.remove('desktop'); // no flicker
+      entryCandle.src = 'assets/images/candle_loop.gif'; // same loop as desktop
 
       desktopBar.style.display = 'none';
-      mobileBar.style.display = 'flex';
 
-      candleState = 'off';
-
-      entryCandle.style.cursor = 'pointer';
-
-      entryCandle.addEventListener('click', () => {
-        if (candleState !== 'off') return;
-
-        clearMessage();
-
-        // light animation
-        candleState = 'lighting';
-        entryCandle.src = 'assets/images/candle_light.gif';
-        mobileInput.disabled = true;
-        mobileInput.placeholder = 'Lighting your candle…';
-
-        setTimeout(() => {
-          entryCandle.src = 'assets/images/candle_loop.gif';
-          candleState = 'on';
-          mobileInput.disabled = false;
-          mobileInput.value = '';
-          mobileInput.placeholder = 'Type your wish/thought/prayer and press Enter.';
-          mobileInput.focus();
-
-          clearAuto();
-          autoTimer = setTimeout(extinguishMobile, AUTO_OUT_MS);
-        }, LIGHT_MS);
-      });
-
-      mobileInput.addEventListener('keydown', (e) => {
-        if (e.key !== 'Enter') return;
-        const text = mobileInput.value.trim();
-        if (!text) return;
-        if (candleState !== 'on') return;
-
-        showMobileWhisper(text);
-        mobileInput.value = '';
-
-        // NEW: hide keyboard & freeze input after sending
-        mobileInput.blur();                     // dismiss keyboard
-        mobileInput.disabled = true;            // no more typing this session
-        mobileInput.placeholder = 'Your whisper has been sent.'; // gentle confirmation
-      });
-
+      showMobileSequence();
       fadeInBody();
     }
 
@@ -396,7 +289,7 @@
       setupDesktop();
     }
 
-    // (Optional: in future, we could listen for resize and switch modes.)
+    // (Optional: in future, we could listen for resize and switch modes, but not needed for v1.)
   </script>
 </body>
 </html>
