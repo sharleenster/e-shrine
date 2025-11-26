@@ -320,7 +320,7 @@
       if (candleState !== 'on') return;
       candleState = 'extinguishing';
       clearAuto();
-      // optional: let whisper fade naturally; we don't force-clear it
+      // optional: let whisper fade naturally
 
       entryCandle.src = 'assets/images/candle_out.gif';
       mobileInput.disabled = true;
@@ -379,7 +379,11 @@
 
         showMobileWhisper(text);
         mobileInput.value = '';
-        // later: send to backend here
+
+        // NEW: hide keyboard & freeze input after sending
+        mobileInput.blur();                     // dismiss keyboard
+        mobileInput.disabled = true;            // no more typing this session
+        mobileInput.placeholder = 'Your whisper has been sent.'; // gentle confirmation
       });
 
       fadeInBody();
@@ -392,8 +396,7 @@
       setupDesktop();
     }
 
-    // Optional: if orientation / size changes a lot, you could
-    // reload to switch modes. For now we keep it simple.
+    // (Optional: in future, we could listen for resize and switch modes.)
   </script>
 </body>
 </html>
