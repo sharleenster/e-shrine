@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <title>E-Shrine – Entry</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     html, body {
       margin: 0;
@@ -50,14 +51,19 @@
       max-width: 55vw;
       margin: 0 auto 40px auto;
       cursor: default;
+      position: relative;
     }
 
-    .candle-wrapper img {
+    #entry-candle {
       display: block;
       width: 100%;
       height: auto;
-      animation: candle-flicker 2.4s ease-in-out infinite;
       transform-origin: 50% 100%;
+    }
+
+    /* Desktop-only flicker animation */
+    body.desktop #entry-candle {
+      animation: candle-flicker 2.4s ease-in-out infinite;
     }
 
     @keyframes candle-flicker {
@@ -69,8 +75,46 @@
       100% { transform: scale(1);     filter: brightness(1); }
     }
 
-    /* Bottom bar – matches shrine_tiered style */
-    #bottom-bar {
+    /* Whisper text for mobile */
+    #mobile-whisper {
+      position: absolute;
+      top: -34px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 14px;
+      color: #cac6c6;
+      text-align: center;
+      white-space: nowrap;
+      max-width: 260px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      opacity: 0;
+      pointer-events: none;
+      text-shadow: 0 0 4px rgba(0,0,0,0.85);
+    }
+
+    .whisper-show {
+      opacity: 1;
+      transition: opacity 0.3s ease;
+    }
+
+    .whisper-smoke-out {
+      animation: mobileSmoke 1.8s ease-out forwards;
+    }
+
+    @keyframes mobileSmoke {
+      0% {
+        opacity: 1;
+        transform: translate(-50%, 0);
+      }
+      100% {
+        opacity: 0;
+        transform: translate(-50%, -18px);
+      }
+    }
+
+    /* Shared bottom bar base */
+    .bottom-bar {
       position: fixed;
       left: 50%;
       bottom: 18px;
@@ -86,8 +130,13 @@
       box-shadow: 0 8px 25px rgba(0,0,0,0.7);
       backdrop-filter: blur(6px);
       -webkit-backdrop-filter: blur(6px);
-      cursor: pointer;
       z-index: 200;
+    }
+
+    /* Desktop bar: text + arrow */
+    #desktop-bar {
+      display: none; /* default hidden, enabled in JS if desktop */
+      cursor: pointer;
     }
 
     #entry-text {
@@ -103,54 +152,248 @@
 
     #entry-arrow {
       font-size: 18px;
-      padding: 0 8px;
+      padding: 0 6px;
+      flex-shrink: 0;
+      transition:
+        color 0.2s ease,
+        box-shadow 0.25s ease,
+        transform 0.2s ease;
     }
 
-    #bottom-bar:focus-visible {
+    #desktop-bar:hover #entry-arrow {
+      color: #ffffff;
+      box-shadow: 0 0 14px rgba(255,255,255,0.45);
+      transform: translateY(-1px);
+    }
+
+    #desktop-bar:focus-visible {
       outline: 2px solid rgba(255,255,255,0.9);
       outline-offset: 2px;
+    }
+
+    /* Mobile bar: input only */
+    #mobile-bar {
+      display: none; /* default hidden, enabled in JS if mobile */
+    }
+
+    #mobile-input {
+      flex: 1;
+      border: none;
+      outline: none;
+      background: transparent;
+      color: #f5f5f5;
+      font-size: 14px;
+      padding: 4px 2px;
+    }
+
+    #mobile-input::placeholder {
+      color: #cac6c6;
+      font-style: italic;
+    }
+
+    #mobile-input:disabled {
+      color: rgba(200,200,200,0.4);
     }
   </style>
 </head>
 <body>
   <div class="shell">
     <div class="candle-wrapper">
-      <img src="assets/images/candle_loop.gif" alt="Looping candle">
+      <div id="mobile-whisper"></div>
+      <img id="entry-candle" src="assets/images/candle_loop.gif" alt="Candle">
     </div>
   </div>
 
-  <div id="bottom-bar" tabindex="0">
-    <div id="entry-text">Light a candle</div>
+  <!-- Desktop bar: navigate to shrine -->
+  <div id="desktop-bar" class="bottom-bar" tabindex="0">
+    <div id="entry-text">Light a candle and enter the shrine.</div>
     <div id="entry-arrow">→</div>
+  </div>
+
+  <!-- Mobile bar: whisper input -->
+  <div id="mobile-bar" class="bottom-bar">
+    <input
+      id="mobile-input"
+      type="text"
+      maxlength="80"
+      placeholder="Tap the candle to light it, then type your wish and press Enter."
+      disabled
+    />
   </div>
 
   <script>
     const SHRINE_PAGE = 'shrine_tiered.html';
-    const bottomBar   = document.getElementById('bottom-bar');
+    const entryCandle = document.getElementById('entry-candle');
+    const desktopBar  = document.getElementById('desktop-bar');
+    const mobileBar   = document.getElementById('mobile-bar');
+    const mobileInput = document.getElementById('mobile-input');
+    const mobileWhisper = document.getElementById('mobile-whisper');
 
-    function goToShrine() {
-      document.body.style.transition = 'opacity 0.9s ease';
-      document.body.style.opacity = '0';
-      setTimeout(() => {
-        window.location.href = SHRINE_PAGE;
-      }, 900);
+    const LIGHT_MS = 3000;
+    const OUT_MS   = 2500;
+    const AUTO_OUT_MS = 60000;
+    const MESSAGE_VIS_MS = 20000;
+
+    let candleState = 'off'; // for mobile: 'off' | 'lighting' | 'on' | 'extinguishing'
+    let autoTimer   = null;
+    let msgTimer    = null;
+
+    function isMobile() {
+      return window.innerWidth <= 768;
     }
 
-    // click on bar
-    bottomBar.addEventListener('click', goToShrine);
+    function fadeInBody() {
+      window.addEventListener('load', () => {
+        document.body.classList.add('ready');
+      });
+    }
 
-    // Enter / Space while bar is focused
-    bottomBar.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        goToShrine();
+    // ---------- Desktop setup ----------
+    function setupDesktop() {
+      document.body.classList.add('desktop');
+
+      // candle loop for desktop
+      entryCandle.src = 'assets/images/candle_loop.gif';
+
+      desktopBar.style.display = 'flex';
+      mobileBar.style.display = 'none';
+
+      function goToShrine() {
+        document.body.style.transition = 'opacity 0.9s ease';
+        document.body.style.opacity = '0';
+        setTimeout(() => {
+          window.location.href = SHRINE_PAGE;
+        }, 900);
       }
-    });
 
-    // fade in on load
-    window.addEventListener('load', () => {
-      document.body.classList.add('ready');
-    });
+      desktopBar.addEventListener('click', goToShrine);
+      desktopBar.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          goToShrine();
+        }
+      });
+
+      fadeInBody();
+    }
+
+    // ---------- Mobile setup ----------
+    function clearAuto() {
+      if (autoTimer) {
+        clearTimeout(autoTimer);
+        autoTimer = null;
+      }
+    }
+
+    function clearMessage() {
+      if (!mobileWhisper) return;
+      if (msgTimer) {
+        clearTimeout(msgTimer);
+        msgTimer = null;
+      }
+      mobileWhisper.classList.remove('whisper-show', 'whisper-smoke-out');
+      mobileWhisper.textContent = '';
+    }
+
+    function showMobileWhisper(text) {
+      if (!mobileWhisper) return;
+
+      const trimmed = (text || '').trim();
+      if (!trimmed) return;
+
+      clearMessage();
+      mobileWhisper.textContent = trimmed;
+      mobileWhisper.classList.add('whisper-show');
+
+      msgTimer = setTimeout(() => {
+        mobileWhisper.classList.add('whisper-smoke-out');
+        const ANIM_MS = 1800;
+        msgTimer = setTimeout(() => {
+          mobileWhisper.classList.remove('whisper-show', 'whisper-smoke-out');
+          mobileWhisper.textContent = '';
+          msgTimer = null;
+        }, ANIM_MS);
+      }, MESSAGE_VIS_MS);
+    }
+
+    function extinguishMobile() {
+      if (candleState !== 'on') return;
+      candleState = 'extinguishing';
+      clearAuto();
+      // optional: let whisper fade naturally; we don't force-clear it
+
+      entryCandle.src = 'assets/images/candle_out.gif';
+      mobileInput.disabled = true;
+      mobileInput.placeholder = 'The flame is fading.';
+
+      setTimeout(() => {
+        entryCandle.src = 'assets/images/static_candle.png';
+        candleState = 'off';
+        mobileInput.placeholder = 'Tap the candle to light it, then type your wish and press Enter.';
+      }, OUT_MS);
+    }
+
+    function setupMobile() {
+      document.body.classList.add('mobile');
+
+      // start with unlit candle
+      entryCandle.src = 'assets/images/static_candle.png';
+      document.body.classList.remove('desktop'); // no flicker
+
+      desktopBar.style.display = 'none';
+      mobileBar.style.display = 'flex';
+
+      candleState = 'off';
+
+      entryCandle.style.cursor = 'pointer';
+
+      entryCandle.addEventListener('click', () => {
+        if (candleState !== 'off') return;
+
+        clearMessage();
+
+        // light animation
+        candleState = 'lighting';
+        entryCandle.src = 'assets/images/candle_light.gif';
+        mobileInput.disabled = true;
+        mobileInput.placeholder = 'Lighting your candle…';
+
+        setTimeout(() => {
+          entryCandle.src = 'assets/images/candle_loop.gif';
+          candleState = 'on';
+          mobileInput.disabled = false;
+          mobileInput.value = '';
+          mobileInput.placeholder = 'Type your wish/thought/prayer and press Enter.';
+          mobileInput.focus();
+
+          clearAuto();
+          autoTimer = setTimeout(extinguishMobile, AUTO_OUT_MS);
+        }, LIGHT_MS);
+      });
+
+      mobileInput.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter') return;
+        const text = mobileInput.value.trim();
+        if (!text) return;
+        if (candleState !== 'on') return;
+
+        showMobileWhisper(text);
+        mobileInput.value = '';
+        // later: send to backend here
+      });
+
+      fadeInBody();
+    }
+
+    // ---------- Initialize based on screen ----------
+    if (isMobile()) {
+      setupMobile();
+    } else {
+      setupDesktop();
+    }
+
+    // Optional: if orientation / size changes a lot, you could
+    // reload to switch modes. For now we keep it simple.
   </script>
 </body>
 </html>
