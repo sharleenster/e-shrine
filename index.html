@@ -49,7 +49,7 @@
     .candle-wrapper {
       width: 220px;
       max-width: 55vw;
-      margin: 0 auto 40px auto;
+      margin: 0 auto 24px auto;
       cursor: default;
       position: relative;
     }
@@ -75,26 +75,27 @@
       100% { transform: scale(1);     filter: brightness(1); }
     }
 
-    /* Mobile blocking message – fixed near bottom, always visible */
+    /* Mobile-only message under the candle */
     #mobile-message {
-      position: fixed;
-      left: 50%;
-      bottom: 40px;
-      transform: translateX(-50%);
+      margin: 0 auto;
       font-size: 14px;
       color: #cac6c6;
-      text-align: center;
       max-width: 80vw;
       line-height: 1.4;
-      opacity: 0;
-      pointer-events: none;
-      text-shadow: 0 0 4px rgba(0,0,0,0.85);
-      transition: opacity 0.6s ease;
-      z-index: 50;
     }
 
-    .msg-show {
-      opacity: 1;
+    /* Hide message on desktop */
+    @media (min-width: 769px) {
+      #mobile-message {
+        display: none;
+      }
+    }
+
+    /* Hide desktop bar on mobile */
+    @media (max-width: 768px) {
+      #desktop-bar {
+        display: none;
+      }
     }
 
     /* Shared bottom bar base (desktop only) */
@@ -119,7 +120,6 @@
 
     /* Desktop bar: text + arrow */
     #desktop-bar {
-      display: none; /* default hidden, enabled in JS if desktop */
       cursor: pointer;
     }
 
@@ -161,10 +161,11 @@
     <div class="candle-wrapper">
       <img id="entry-candle" src="assets/images/candle_loop.gif" alt="Candle">
     </div>
+    <p id="mobile-message">
+      The shrine cannot be entered from a mobile device.<br>
+      Please visit on a laptop or desktop to light a candle.
+    </p>
   </div>
-
-  <!-- Mobile message container -->
-  <div id="mobile-message"></div>
 
   <!-- Desktop bar: navigate to shrine -->
   <div id="desktop-bar" class="bottom-bar" tabindex="0">
@@ -173,33 +174,19 @@
   </div>
 
   <script>
-    const SHRINE_PAGE   = 'shrine_tiered.html';
-    const entryCandle   = document.getElementById('entry-candle');
-    const desktopBar    = document.getElementById('desktop-bar');
-    const mobileMessage = document.getElementById('mobile-message');
-
-    const MESSAGE_VIS_MS = 20000; // time each message stays fully visible
-
-    function isMobile() {
-      return window.innerWidth <= 768;
-    }
+    const SHRINE_PAGE = 'shrine_tiered.html';
+    const entryCandle = document.getElementById('entry-candle');
+    const desktopBar  = document.getElementById('desktop-bar');
 
     function fadeInBody() {
       window.addEventListener('load', () => {
         document.body.classList.add('ready');
+        // mark as desktop for flicker; harmless on mobile
+        document.body.classList.add('desktop');
       });
     }
 
-    // ---------- Desktop setup ----------
-    function setupDesktop() {
-      document.body.classList.add('desktop');
-
-      entryCandle.src = 'assets/images/candle_loop.gif';
-
-      desktopBar.style.display = 'flex';
-      mobileMessage.textContent = '';
-      mobileMessage.className = '';
-
+    function setupDesktopLink() {
       function goToShrine() {
         document.body.style.transition = 'opacity 0.9s ease';
         document.body.style.opacity = '0';
@@ -215,65 +202,10 @@
           goToShrine();
         }
       });
-
-      fadeInBody();
     }
 
-    // ---------- Mobile setup (block shrine access) ----------
-    function showMobileSequence() {
-      if (!mobileMessage) return;
-
-      const messages = [
-        "The shrine cannot be entered from a mobile device.",
-        "Enjoy the flame while you’re here.",
-        "Shared flames, private whispers."
-      ];
-
-      let index = 0;
-
-      function showNext() {
-        const text = messages[index];
-        mobileMessage.textContent = text;
-
-        // fade in
-        mobileMessage.classList.add('msg-show');
-
-        if (index < messages.length - 1) {
-          // First two lines: hold, then fade out, then next
-          setTimeout(() => {
-            mobileMessage.classList.remove('msg-show'); // fade out
-            const FADE_MS = 600;
-            setTimeout(() => {
-              index += 1;
-              showNext();
-            }, FADE_MS);
-          }, MESSAGE_VIS_MS);
-        } else {
-          // Last message stays visible
-        }
-      }
-
-      showNext();
-    }
-
-    function setupMobile() {
-      document.body.classList.add('mobile');
-      document.body.classList.remove('desktop');
-
-      entryCandle.src = 'assets/images/candle_loop.gif'; // same loop as desktop
-
-      desktopBar.style.display = 'none';
-
-      showMobileSequence();
-      fadeInBody();
-    }
-
-    // ---------- Initialize based on screen ----------
-    if (isMobile()) {
-      setupMobile();
-    } else {
-      setupDesktop();
-    }
+    fadeInBody();
+    setupDesktopLink();
   </script>
 </body>
 </html>
