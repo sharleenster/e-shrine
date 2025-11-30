@@ -388,5 +388,36 @@
       });
     }
   </script>
+
+<script type="module">
+  import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+  // 1) PASTE YOUR VALUES HERE
+  const SUPABASE_URL = 'https://hclnnnaqyjmgeuavfbry.supabase.co';
+  const SUPABASE_ANON_KEY =
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhjbG5ubmFxeWptZ2V1YXZmYnJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ0MjkzNjgsImV4cCI6MjA4MDAwNTM2OH0.mkCXmoD0Uvg6qSImrA7kS6tBXWtRHX3lPACg31kcpuI';
+
+  // 2) Create Supabase client
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // 3) Tiny test: try to read 1 row from "candles"
+  async function testConnection() {
+    try {
+      const { data, error } = await supabase
+        .from('candles')
+        .select('*')
+        .limit(1);
+
+      if (error) throw error;
+
+      console.log('✅ Supabase connection OK. Sample data:', data);
+    } catch (err) {
+      console.error('❌ Supabase test failed:', err.message);
+    }
+  }
+
+  testConnection();
+</script>
+
 </body>
 </html>
