@@ -157,6 +157,9 @@
     const PER_ROW_COUNTS = [12, 12, 12];
     const ROWS           = PER_ROW_COUNTS.length;
 
+    // Each candle in the shrine gets a stable index (0,1,2,3...)
+    let nextCandleIndex = 0;
+
     const EDGE_X        = 80;
     const EDGE_Y_TOP    = 60;
     const BOTTOM_GUTTER = 200;
@@ -267,22 +270,22 @@
       }, OUT_MS);
     }
 
-    function createCandle(x, y, widthPx, depthT, isBottomRow) {
+    function createCandle(x, y, widthPx, depthT, isBottomRow, index) {
       const wrap = document.createElement('div');
       wrap.className = 'candle-wrap';
-      wrap.style.left = `${x}px`;
-      wrap.style.top  = `${y}px`;
+      wrap.style.left  = `${x}px`;
+      wrap.style.top   = `${y}px`;
       wrap.style.width = `${widthPx}px`;
+
+      // store a stable index on this candle wrapper
+      wrap.dataset.candleIndex = String(index);
+
       stage.appendChild(wrap);
 
       const img = document.createElement('img');
       img.className = 'candle';
       img.src = 'assets/images/static_candle.png';
-
-      const blur    = (1 - depthT) * 1.4;
-      const opacity = 0.72 + depthT * 0.28;
-      img.style.filter  = `blur(${blur}px)`;
-      img.style.opacity = opacity.toFixed(2);
+      img.alt = 'Candle';
       wrap.appendChild(img);
 
       const msg = document.createElement('div');
@@ -293,15 +296,23 @@
       stateMap.set(wrap, 'off');
 
       img.addEventListener('click', () => {
-        const s = stateMap.get(wrap);
+        const s   = stateMap.get(wrap);
+        const idx = wrap.dataset.candleIndex;
+        console.log('Clicked candle index:', idx);
 
-        // only one active candle
+        // only one active candle at a time
         if (activeCandle && activeCandle !== wrap) return;
 
+        // OFF → LIGHTING
         if (s === 'off') {
           activeCandle = wrap;
           clearMessage(wrap);
           resetInputToIdle();
+
+          // Write this candle's state to Supabase (if available)
+          if (typeof writeCandleState === 'function' && idx != null) {
+            writeCandleState(parseInt(idx, 10));
+          }
 
           img.src = 'assets/images/candle_light.gif';
           stateMap.set(wrap, 'lighting');
@@ -313,18 +324,29 @@
             setAutoTimer(wrap);
             enableInputForActive();
           }, LIGHT_MS);
+
+        // ON → EXTINGUISHING (manual click)
         } else if (s === 'on') {
-          extinguish(wrap);
+          stateMap.set(wrap, 'extinguishing');
+          img.src = 'assets/images/candle_out.gif';
+          clearAutoTimer(wrap);
+          wishInput.disabled = true;
+
+          setTimeout(() => {
+            img.src = 'assets/images/static_candle.png';
+            stateMap.set(wrap, 'off');
+            if (activeCandle === wrap) activeCandle = null;
+            resetInputToIdle();
+          }, OUT_MS);
         }
       });
-
-      return wrap;
     }
 
     function layoutRowsDepth() {
       stage.innerHTML = '';
       activeCandle = null;
       resetInputToIdle();
+      nextCandleIndex = 0;
 
       const W = stage.clientWidth;
       const H = stage.clientHeight;
@@ -355,12 +377,23 @@
           const x = baseCenterX - w / 2 + jitterX;
           const y = rowYCenter - (w * 1.1) / 2 + jitterY;
 
-          createCandle(x, y, w, depthT, r === ROWS - 1);
+          createCandle(
+            x,
+            y,
+            w,
+            depthT,
+            r === ROWS - 1,
+            nextCandleIndex++
+          );
         }
       }
     }
 
     layoutRowsDepth();
+
+    window.addEventListener('resize', () => {
+      layoutRowsDepth();
+    });
 
     // Enter to send wish
     wishInput.addEventListener('keydown', (e) => {
@@ -389,35 +422,53 @@
     }
   </script>
 
-<script type="module">
-  import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+  <!-- Supabase module: connection + write on light -->
+  <script type="module">
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-  // 1) PASTE YOUR VALUES HERE
-  const SUPABASE_URL = 'https://hclnnnaqyjmgeuavfbry.supabase.co';
-  const SUPABASE_ANON_KEY =
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhjbG5ubmFxeWptZ2V1YXZmYnJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ0MjkzNjgsImV4cCI6MjA4MDAwNTM2OH0.mkCXmoD0Uvg6qSImrA7kS6tBXWtRHX3lPACg31kcpuI';
+    const SUPABASE_URL = 'https://hclnnnaqyjmgeuavfbry.supabase.co';
+    const SUPABASE_ANON_KEY =
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhjbG5ubmFxeWptZ2V1YXZmYnJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ0MjkzNjgsImV4cCI6MjA4MDAwNTM2OH0.mkCXmoD0Uvg6qSImrA7kS6tBXWtRHX3lPACg31kcpuI';
 
-  // 2) Create Supabase client
-  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  // 3) Tiny test: try to read 1 row from "candles"
-  async function testConnection() {
-    try {
-      const { data, error } = await supabase
+    // Expose globally so non-module script can call it
+    window.writeCandleState = async function (index, litSeconds = 60) {
+      const now = new Date();
+      const extinguishAt = new Date(now.getTime() + litSeconds * 1000);
+
+      const { error } = await supabase
         .from('candles')
-        .select('*')
-        .limit(1);
+        .upsert({
+          candle_index: index,
+          is_lit: true,
+          lit_at: now.toISOString(),
+          extinguish_at: extinguishAt.toISOString()
+        });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Supabase write failed:', error.message);
+      } else {
+        console.log(`🔥 Wrote candle ${index} to Supabase`);
+      }
+    };
 
-      console.log('✅ Supabase connection OK. Sample data:', data);
-    } catch (err) {
-      console.error('❌ Supabase test failed:', err.message);
+    // Tiny connection test
+    async function testConnection() {
+      try {
+        const { data, error } = await supabase
+          .from('candles')
+          .select('*')
+          .limit(1);
+
+        if (error) throw error;
+        console.log('✅ Supabase connection OK. Sample data:', data);
+      } catch (err) {
+        console.error('❌ Supabase test failed:', err.message);
+      }
     }
-  }
 
-  testConnection();
-</script>
-
+    testConnection();
+  </script>
 </body>
 </html>
