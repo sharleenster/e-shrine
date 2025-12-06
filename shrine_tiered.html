@@ -468,7 +468,25 @@
       }
     }
 
-    testConnection();
-  </script>
+// -----------------------------------------------------------
+// Read all currently lit candles from Supabase
+// -----------------------------------------------------------
+async function loadLitCandles() {
+  const { data, error } = await supabase
+    .from('candles')
+    .select('*')
+    .gte('extinguish_at', new Date().toISOString());
+
+  if (error) {
+    console.error("❌ Failed loading lit candles:", error.message);
+    return [];
+  }
+
+  console.log("🕯️ Loaded lit candles:", data);
+  return data;
+}
+
+testConnection();
+loadLitCandles();
 </body>
 </html>
