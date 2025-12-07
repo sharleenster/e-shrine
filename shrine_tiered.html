@@ -187,6 +187,9 @@
     const autoMap   = new WeakMap();
     const msgMap    = new WeakMap();
 
+    // NEW: keep a reference to every candle wrapper by index
+    const allCandles = [];
+
     let activeCandle = null;
 
     function clearAutoTimer(node) {
@@ -279,6 +282,9 @@
 
       // store a stable index on this candle wrapper
       wrap.dataset.candleIndex = String(index);
+
+      // NEW: remember this wrapper in our array
+      allCandles[index] = wrap;
 
       stage.appendChild(wrap);
 
@@ -422,27 +428,29 @@
     }
 
     // -------------------------------------------------
-    // Backend → UI helper: light a candle by index
-    // (used when we load from Supabase or get realtime events)
+    // Backend → UI helper: apply candles from Supabase
+    // (used on initial load + realtime events)
     // -------------------------------------------------
-    window.lightCandleFromBackend = function (index) {
-      if (index === undefined || index === null) return;
+    window.applyBackendLitCandles = function (rows) {
+      if (!rows || !rows.length) return;
 
-      // Find the wrapper whose data-candle-index matches
-      const wraps = stage.querySelectorAll('.candle-wrap');
-      const target = Array.from(wraps).find(
-        (w) => w.dataset.candleIndex === String(index)
-      );
-      if (!target) return;
+      rows.forEach((row) => {
+        const idx = row.candle_index;
+        const wrap = allCandles[idx];
+        if (!wrap) return;
 
-      const s = stateMap.get(target);
-      // If it’s already on / animating, don’t touch it
-      if (s && s !== 'off') return;
+        const currentState = stateMap.get(wrap);
+        // Don't override a candle in use locally
+        if (currentState && currentState !== 'off') return;
 
-      // IMPORTANT: this is a *remote* candle,
-      // so we do NOT set activeCandle
-      stateMap.set(target, 'lighting');
-      doLight(target);
+        const ui = wrap.__ui;
+        if (!ui || !ui.imgEl) return;
+
+        // Instantly show this candle as lit
+        ui.imgEl.src = 'assets/images/candle_loop.gif';
+        stateMap.set(wrap, 'on');
+        setAutoTimer(wrap);
+      });
     };
 
   </script>
@@ -516,8 +524,8 @@
       return data;
     }
 
-    // -----------------------------------------------------------
-    // Realtime subscription: log candle changes
+     // -----------------------------------------------------------
+    // Realtime subscription: light candles when other users light them
     // -----------------------------------------------------------
     function listenForCandleChanges() {
       const channel = supabase
@@ -525,14 +533,19 @@
         .on(
           'postgres_changes',
           {
-            event: '*',          // INSERT, UPDATE, DELETE
+            event: 'INSERT',
             schema: 'public',
             table: 'candles'
           },
           (payload) => {
             console.log('🔔 Realtime change from Supabase:', payload);
+            const row = payload.new;
+
+            if (window.applyBackendLitCandles && row) {
+              window.applyBackendLitCandles([row]);  // use main-script UI helper
+            }
           }
-        )
+        )  // <-- THIS ) WAS MISSING
         .subscribe((status) => {
           console.log('🔌 Realtime status:', status);
         });
