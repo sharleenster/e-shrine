@@ -420,9 +420,34 @@
         }, 900);
       });
     }
+
+    // -------------------------------------------------
+    // Backend → UI helper: light a candle by index
+    // (used when we load from Supabase or get realtime events)
+    // -------------------------------------------------
+    window.lightCandleFromBackend = function (index) {
+      if (index === undefined || index === null) return;
+
+      // Find the wrapper whose data-candle-index matches
+      const wraps = stage.querySelectorAll('.candle-wrap');
+      const target = Array.from(wraps).find(
+        (w) => w.dataset.candleIndex === String(index)
+      );
+      if (!target) return;
+
+      const s = stateMap.get(target);
+      // If it’s already on / animating, don’t touch it
+      if (s && s !== 'off') return;
+
+      // IMPORTANT: this is a *remote* candle,
+      // so we do NOT set activeCandle
+      stateMap.set(target, 'lighting');
+      doLight(target);
+    };
+
   </script>
 
-  <!-- Supabase module: connection + write on light -->
+    <!-- Supabase module: connection + write on light + realtime logging -->
   <script type="module">
     import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -432,7 +457,9 @@
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // Expose globally so non-module script can call it
+    // -----------------------------------------------------------
+    // Write / update a candle row when we light it locally
+    // -----------------------------------------------------------
     window.writeCandleState = async function (index, litSeconds = 60) {
       const now = new Date();
       const extinguishAt = new Date(now.getTime() + litSeconds * 1000);
@@ -453,7 +480,9 @@
       }
     };
 
+    // -----------------------------------------------------------
     // Tiny connection test
+    // -----------------------------------------------------------
     async function testConnection() {
       try {
         const { data, error } = await supabase
@@ -468,27 +497,51 @@
       }
     }
 
-// -----------------------------------------------------------
-// Read all currently lit candles from Supabase
-// -----------------------------------------------------------
-async function loadLitCandles() {
-  const { data, error } = await supabase
-    .from('candles')
-    .select('*')
-    .gte('extinguish_at', new Date().toISOString());
+    // -----------------------------------------------------------
+    // Read all currently lit candles from Supabase
+    // (for now we just log them)
+    // -----------------------------------------------------------
+    async function loadLitCandles() {
+      const { data, error } = await supabase
+        .from('candles')
+        .select('*')
+        .gte('extinguish_at', new Date().toISOString());
 
-  if (error) {
-    console.error("❌ Failed loading lit candles:", error.message);
-    return [];
-  }
+      if (error) {
+        console.error('❌ Failed loading lit candles:', error.message);
+        return [];
+      }
 
-  console.log("🕯️ Loaded lit candles:", data);
-  return data;
-}
-testConnection();
-loadLitCandles();
-</script>   <!-- 👈 THIS LINE WAS MISSING -->
-</body>
-</html>
+      console.log('🕯️ Loaded lit candles:', data);
+      return data;
+    }
+
+    // -----------------------------------------------------------
+    // Realtime subscription: log candle changes
+    // -----------------------------------------------------------
+    function listenForCandleChanges() {
+      const channel = supabase
+        .channel('candles-realtime')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',          // INSERT, UPDATE, DELETE
+            schema: 'public',
+            table: 'candles'
+          },
+          (payload) => {
+            console.log('🔔 Realtime change from Supabase:', payload);
+          }
+        )
+        .subscribe((status) => {
+          console.log('🔌 Realtime status:', status);
+        });
+    }
+
+    // Kick everything off
+    testConnection();
+    loadLitCandles();
+    listenForCandleChanges();
+  </script>
 </body>
 </html>
