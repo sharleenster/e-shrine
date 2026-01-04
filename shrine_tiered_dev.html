@@ -413,6 +413,10 @@
       if (s !== 'on') return;
 
       showMessage(activeCandle, text);
+      const idx = parseInt(activeCandle.dataset.candleIndex, 10);
+if (typeof window.writeWhisper === 'function' && !Number.isNaN(idx)) {
+  window.writeWhisper(idx, text);
+}
       wishInput.value = '';
     });
 
@@ -464,6 +468,36 @@
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhjbG5ubmFxeWptZ2V1YXZmYnJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ0MjkzNjgsImV4cCI6MjA4MDAwNTM2OH0.mkCXmoD0Uvg6qSImrA7kS6tBXWtRHX3lPACg31kcpuI';
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // -----------------------------------------------------------
+// Whispers: write a whisper row
+// -----------------------------------------------------------
+window.writeWhisper = async function (candleIndex, textRaw) {
+  try {
+    const raw = (textRaw || '').trim();
+    if (!raw) return;
+
+    // For now: traces only for the public field
+    // (simple placeholder trace — we'll improve later)
+    const trace = '•••••';
+
+    const { error } = await supabase
+      .from('whispers')
+      .insert({
+        candle_id: `candle_${String(candleIndex).padStart(2, '0')}`,
+        text_raw: raw,
+        trace_public: trace
+      });
+
+    if (error) {
+      console.error('❌ Whisper insert failed:', error.message);
+    } else {
+      console.log('✅ Whisper inserted');
+    }
+  } catch (err) {
+    console.error('❌ Whisper insert exception:', err);
+  }
+};
 
     // -----------------------------------------------------------
     // Write / update a candle row when we light it locally
