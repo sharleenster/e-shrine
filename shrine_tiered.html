@@ -74,6 +74,32 @@
       }
     }
 
+    /* Whisper trace (soft, ephemeral gesture) */
+    .trace {
+      position: absolute;
+      left: 50%;
+      top: -16px;
+      transform: translateX(-50%);
+      height: 8px;
+      width: 70px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.55);
+      filter: blur(6px);
+      opacity: 0.75;
+      pointer-events: none;
+      transition:
+        opacity 20s ease-out,
+        filter 20s ease-out,
+        transform 20s ease-out;
+      z-index: 1200; /* above whisper text */
+    }
+
+    .trace.fade {
+      opacity: 0;
+      filter: blur(14px);
+      transform: translateX(-50%) translateY(-10px);
+    }
+
     /* Bottom input bar – matches index.html, rectangular with subtle rounding */
     #bottom-bar {
       position: fixed;
@@ -189,6 +215,37 @@
 
     // NEW: keep a reference to every candle wrapper by index
     const allCandles = [];
+
+    // -----------------------------------------------------------
+// Visual: render a soft trace near the candle for a whisper row
+// -----------------------------------------------------------
+window.renderWhisperTraceNearCandle = function (row) {
+  if (!row || !row.candle_id) return;
+
+  // candle_id looks like "candle_01"
+  const parts = String(row.candle_id).split('_');
+  const idx = parseInt(parts[1], 10);
+  if (Number.isNaN(idx)) return;
+
+  const wrap = allCandles[idx];
+  if (!wrap) return;
+
+  const el = document.createElement('div');
+  el.className = 'trace';
+
+  // optional: vary width based on trace_public length
+  const t = row.trace_public;
+  if (typeof t === 'string' && t.length) {
+    el.style.width = `${Math.min(140, 50 + t.length * 10)}px`;
+  }
+
+  wrap.appendChild(el);
+
+  // fade then remove
+  setTimeout(() => el.classList.add('fade'), 40);
+  setTimeout(() => el.remove(), 20500);
+};
+
 
     let activeCandle = null;
 
@@ -585,10 +642,59 @@ window.writeWhisper = async function (candleIndex, textRaw) {
         });
     }
 
+    // -----------------------------------------------------------
+// Realtime subscription: listen for whisper inserts
+// (Step 1: log only)
+// -----------------------------------------------------------
+function listenForWhisperChanges() {
+  supabase
+    .channel('whispers-realtime')
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'whispers' },
+      (payload) => {
+        console.log('🫧 Whisper realtime event:', payload);
+        console.log('🫧 Whisper row:', payload.new);
+        if (window.renderWhisperTraceNearCandle) window.renderWhisperTraceNearCandle(payload.new);
+
+      }
+    )
+    .subscribe((status) => {
+      console.log('🫧 Whisper realtime status:', status);
+    });
+}
+
     // Kick everything off
     testConnection();
     loadLitCandles();
     listenForCandleChanges();
+    listenForTraceChanges();
+    listenForWhisperChanges();
+    
+    // -----------------------------------------------------------
+// Realtime subscription: listen for public trace inserts
+// (for now we just log them)
+// -----------------------------------------------------------
+function listenForTraceChanges() {
+  const channel = supabase
+    .channel('whisper-traces-realtime')
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'whisper_traces'
+      },
+      (payload) => {
+        console.log('🫧 Trace realtime event:', payload);
+        console.log('🫧 Trace row:', payload.new);
+      }
+    )
+    .subscribe((status) => {
+      console.log('🫧 Trace realtime status:', status);
+    });
+}
+
   </script>
 </body>
 </html>
