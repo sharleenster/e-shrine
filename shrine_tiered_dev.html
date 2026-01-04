@@ -585,12 +585,33 @@ window.writeWhisper = async function (candleIndex, textRaw) {
         });
     }
 
+    // -----------------------------------------------------------
+// Realtime subscription: listen for whisper inserts
+// (Step 1: log only)
+// -----------------------------------------------------------
+function listenForWhisperChanges() {
+  supabase
+    .channel('whispers-realtime')
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'whispers' },
+      (payload) => {
+        console.log('🫧 Whisper realtime event:', payload);
+        console.log('🫧 Whisper row:', payload.new);
+      }
+    )
+    .subscribe((status) => {
+      console.log('🫧 Whisper realtime status:', status);
+    });
+}
+
     // Kick everything off
     testConnection();
     loadLitCandles();
     listenForCandleChanges();
     listenForTraceChanges();
-
+    listenForWhisperChanges();
+    
     // -----------------------------------------------------------
 // Realtime subscription: listen for public trace inserts
 // (for now we just log them)
