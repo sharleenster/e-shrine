@@ -538,6 +538,14 @@ window.writeWhisper = async function (candleIndex, textRaw) {
     // (simple placeholder trace — we'll improve later)
     const trace = '•••••';
 
+        // NEW: remember what THIS tab just submitted so we can suppress trace locally
+    window.__lastLocalWhisper = {
+      candle_id: `candle_${String(candleIndex).padStart(2, '0')}`,
+      text_raw: raw,
+      at: Date.now()
+    };
+
+
     const { error } = await supabase
       .from('whispers')
       .insert({
@@ -615,36 +623,10 @@ window.writeWhisper = async function (candleIndex, textRaw) {
       return data;
     }
 
-     // -----------------------------------------------------------
-    // Realtime subscription: light candles when other users light them
-    // -----------------------------------------------------------
-    function listenForCandleChanges() {
-      const channel = supabase
-        .channel('candles-realtime')
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'candles'
-          },
-          (payload) => {
-            console.log('🔔 Realtime change from Supabase:', payload);
-            const row = payload.new;
-
-            if (window.applyBackendLitCandles && row) {
-              window.applyBackendLitCandles([row]);  // use main-script UI helper
-            }
-          }
-        )  // <-- THIS ) WAS MISSING
-        .subscribe((status) => {
-          console.log('🔌 Realtime status:', status);
-        });
-    }
-
-    // -----------------------------------------------------------
+   
+// -----------------------------------------------------------
 // Realtime subscription: listen for whisper inserts
-// (Step 1: log only)
+// (author tab suppresses its own trace)
 // -----------------------------------------------------------
 function listenForWhisperChanges() {
   supabase
@@ -655,14 +637,51 @@ function listenForWhisperChanges() {
       (payload) => {
         console.log('🫧 Whisper realtime event:', payload);
         console.log('🫧 Whisper row:', payload.new);
-        if (window.renderWhisperTraceNearCandle) window.renderWhisperTraceNearCandle(payload.new);
 
+        const row = payload.new;
+
+        // Suppress trace in the tab that authored this whisper
+        const last = window.__lastLocalWhisper;
+        const isLocal =
+          last &&
+          row &&
+          row.candle_id === last.candle_id &&
+          row.text_raw === last.text_raw &&
+          (Date.now() - last.at) < 10000; // 10s safety window
+
+        if (!isLocal && window.renderWhisperTraceNearCandle) {
+          window.renderWhisperTraceNearCandle(row);
+        }
       }
     )
     .subscribe((status) => {
       console.log('🫧 Whisper realtime status:', status);
     });
 }
+
+// -----------------------------------------------------------
+// Realtime subscription: light candles when other users light them
+// -----------------------------------------------------------
+function listenForCandleChanges() {
+  supabase
+    .channel('candles-realtime')
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'candles' },
+      (payload) => {
+        console.log('🔔 Realtime change from Supabase:', payload);
+        const row = payload.new;
+
+        if (window.applyBackendLitCandles && row) {
+          window.applyBackendLitCandles([row]);
+        }
+      }
+    )
+    .subscribe((status) => {
+      console.log('🔌 Realtime status:', status);
+    });
+}
+
 
     // Kick everything off
     testConnection();
