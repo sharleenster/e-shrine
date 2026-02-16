@@ -102,13 +102,13 @@
     .bottom-bar {
       position: fixed;
       left: 50%;
-      bottom: 18px;
+      bottom: 75px;
       transform: translateX(-50%);
       width: min(70vw, 640px);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 6px 10px;
+      padding: 10px 0;
       background: rgba(0,0,0,0.8);
       border-radius: 4px;
       border: 1px solid rgba(255,255,255,0.35);
@@ -118,10 +118,45 @@
       z-index: 200;
     }
 
+    /* Index-only override: remove box styling */
+#desktop-bar {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  padding: 10px 0; /* keeps good click area */
+}
+
     /* Desktop bar: text + arrow */
     #desktop-bar {
       cursor: pointer;
     }
+
+    #entry-links{
+  flex: 1;
+  font-size: 14px;
+  color: rgba(230,230,230,0.9);
+  text-align: center;
+  padding: 4px 2px;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.entry-link{
+  cursor: pointer;
+  transition: color 0.2s ease, text-shadow 0.25s ease;
+}
+
+.entry-link:hover{
+  color: #ffffff;
+  text-shadow: 0 0 14px rgba(255,255,255,0.45);
+}
+
+.entry-sep{
+  margin: 0 10px;
+  color: rgba(230,230,230,0.5);
+}
 
     #entry-text {
       flex: 1;
@@ -167,13 +202,16 @@
   </div>
 
   <!-- Desktop bar: navigate to shrine -->
-  <div id="desktop-bar" class="bottom-bar" tabindex="0">
-    <div id="entry-text">Enter the shrine to light a candle.</div>
-    <div id="entry-arrow">→</div>
+ <div id="desktop-bar" class="bottom-bar" tabindex="0" aria-label="Choose an experience">
+  <div id="entry-links">
+    <span class="entry-link" data-target="shryne_live.html">Candlelight Vigil</span>
+    <span class="entry-sep">|</span>
+    <span class="entry-link" data-target="shrine_tiered.html">Memorial</span>
   </div>
+</div>
 
   <script>
-    const SHRINE_PAGE = 'shrine_tiered.html';
+    const DEFAULT_PAGE = 'shrine_tiered.html';
     const entryCandle = document.getElementById('entry-candle');
     const desktopBar  = document.getElementById('desktop-bar');
 
@@ -186,23 +224,31 @@
     }
 
     function setupDesktopLink() {
-      function goToShrine() {
-        document.body.style.transition = 'opacity 0.9s ease';
-        document.body.style.opacity = '0';
-        setTimeout(() => {
-          window.location.href = SHRINE_PAGE;
-        }, 900);
-      }
+  function goTo(target) {
+    const page = target || DEFAULT_PAGE;
+    document.body.style.transition = 'opacity 0.9s ease';
+    document.body.style.opacity = '0';
+    setTimeout(() => {
+      window.location.href = page;
+    }, 900);
+  }
 
-      desktopBar.addEventListener('click', goToShrine);
-      desktopBar.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          goToShrine();
-        }
-      });
+  // click the specific option
+  desktopBar.addEventListener('click', (e) => {
+    const link = e.target.closest('.entry-link');
+    if (link) {
+      goTo(link.dataset.target);
     }
+  });
 
+  // keyboard: Enter = default (or focused link, if you later make them buttons)
+  desktopBar.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      goTo(DEFAULT_PAGE);
+    }
+  });
+}
     fadeInBody();
     setupDesktopLink();
   </script>
