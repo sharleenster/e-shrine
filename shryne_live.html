@@ -13,11 +13,23 @@
       color: #eee;
     }
 
-    #stage {
-      position: relative;
-      width: 100vw;
-      height: 100vh;
-    }
+#viewport 
+{
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  width: 1024px;
+  height: 617px;
+  transform: translate(-50%, -50%) scale(1);
+  transform-origin: top left;
+}
+
+#stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
 
     .candle-wrap {
       position: absolute;
@@ -102,9 +114,9 @@
 
     /* Bottom input bar – matches index.html, rectangular with subtle rounding */
     #bottom-bar {
-      position: fixed;
+      position: absolute;  /* change from fixed */
       left: 50%;
-      bottom: 75px;
+      bottom:75px;
       transform: translateX(-50%);
       width: min(70vw, 640px);
       display: flex;
@@ -172,9 +184,11 @@
   </style>
 </head>
 <body>
+
+ <div id="viewport">
   <div id="stage"></div>
 
-  <!-- Input bar with back arrow inside (right) -->
+  <!-- Input bar -->
   <div id="bottom-bar">
     <div id="back-arrow">←</div>
     <input
@@ -185,11 +199,16 @@
       disabled
     />
   </div>
+</div>
 
   <script>
-    // ------------ layout & timing knobs ------------
-    const PER_ROW_COUNTS = [12, 12, 12];
-    const ROWS           = PER_ROW_COUNTS.length;
+  // ------------ layout & timing knobs ------------
+  const PER_ROW_COUNTS = [12, 12, 12];
+  const ROWS           = PER_ROW_COUNTS.length;
+
+  // NEW: fixed stage size for shryne_live
+  const STAGE_W = 1024;
+  const STAGE_H = 617;
 
     // Each candle in the shrine gets a stable index (0,1,2,3...)
     let nextCandleIndex = 0;
@@ -213,13 +232,23 @@
 
     const ENTRY_PAGE = 'index.html';
 
-    const stage     = document.getElementById('stage');
-    const wishInput = document.getElementById('wish-input');
-    const backArrow = document.getElementById('back-arrow');
+const stage     = document.getElementById('stage');
+const wishInput = document.getElementById('wish-input');
+const backArrow = document.getElementById('back-arrow');
+const viewport  = document.getElementById('viewport');  // ← ADD THIS LINE
 
-    const stateMap  = new WeakMap();
-    const autoMap   = new WeakMap();
-    const msgMap    = new WeakMap();
+  function fitStage() {
+  const scale = Math.min(
+    window.innerWidth / STAGE_W,
+    window.innerHeight / STAGE_H
+  );
+
+    viewport.style.transform = `translate(-50%, -50%) scale(${scale})`;
+  }
+
+  const stateMap  = new WeakMap();
+  const autoMap   = new WeakMap();
+  const msgMap    = new WeakMap();
 
     // NEW: keep a reference to every candle wrapper by index
     const allCandles = [];
@@ -461,9 +490,10 @@ window.renderWhisperTraceNearCandle = function (row) {
     }
 
     layoutRowsDepth();
+    fitStage();
 
     window.addEventListener('resize', () => {
-      layoutRowsDepth();
+      fitStage();
     });
 
     // Enter to send wish
@@ -534,7 +564,7 @@ if (typeof window.writeWhisper === 'function' && !Number.isNaN(idx)) {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // -----------------------------------------------------------
+// -----------------------------------------------------------
 // Whispers: write a whisper row
 // -----------------------------------------------------------
 window.writeWhisper = async function (candleIndex, textRaw) {
