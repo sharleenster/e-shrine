@@ -237,7 +237,16 @@
   desktopBar.addEventListener('click', (e) => {
     const link = e.target.closest('.entry-link');
     if (link) {
-      goTo(link.dataset.target);
+    desktopBar.addEventListener('click', (e) => {
+  const link = e.target.closest('.entry-link');
+  if (!link) return;
+
+  const target = link.dataset.target;
+
+
+  // Memorial → normal navigation with your existing fade
+  goTo(target);
+});
     }
   });
 
