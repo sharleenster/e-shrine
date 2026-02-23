@@ -13,32 +13,22 @@
       color: #eee;
     }
 
-#viewport {
-  position: fixed;
-  inset: 0;              /* replaces left/top/translate centering */
-  margin: auto;          /* centers horizontally and vertically */
-  width: 1024px;
-  height: 617px;
-  transform-origin: center center;
-}
+    #stage {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      z-index: 1;
+    }
 
-#particleField {
-  position: fixed;
-  inset: 0;
-  width: 100vw;
-  height: 100vh;
-  z-index: 0;
-  pointer-events: none;
-  background: transparent;
-}
-
-#stage {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  z-index: 1;
-}
-
+    #particleField {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 0;
+      pointer-events: none;
+    background: transparent;
+    }
 
     .candle-wrap {
       position: absolute;
@@ -123,9 +113,9 @@
 
     /* Bottom input bar – matches index.html, rectangular with subtle rounding */
     #bottom-bar {
-      position: absolute;  /* change from fixed */
+      position: fixed;
       left: 50%;
-      bottom:75px;
+      bottom: 75px;
       transform: translateX(-50%);
       width: min(70vw, 640px);
       display: flex;
@@ -193,12 +183,10 @@
   </style>
 </head>
 <body>
-<canvas id="particleField" aria-hidden="true"></canvas>
-
- <div id="viewport">
+  <canvas id="particleField" aria-hidden="true"></canvas>
   <div id="stage"></div>
 
-  <!-- Input bar -->
+  <!-- Input bar with back arrow inside (right) -->
   <div id="bottom-bar">
     <div id="back-arrow">←</div>
 <input
@@ -212,17 +200,13 @@
   autocapitalize="off"
   spellcheck="false"
 />
+
   </div>
-</div>
 
   <script>
-  // ------------ layout & timing knobs ------------
-  const PER_ROW_COUNTS = [12, 12, 12];
-  const ROWS           = PER_ROW_COUNTS.length;
-
-  // NEW: fixed stage size for shryne_live
-  const STAGE_W = 1024;
-  const STAGE_H = 617;
+    // ------------ layout & timing knobs ------------
+    const PER_ROW_COUNTS = [12, 12, 12];
+    const ROWS           = PER_ROW_COUNTS.length;
 
     // Each candle in the shrine gets a stable index (0,1,2,3...)
     let nextCandleIndex = 0;
@@ -246,22 +230,13 @@
 
     const ENTRY_PAGE = 'index.html';
 
-const stage     = document.getElementById('stage');
-const wishInput = document.getElementById('wish-input');
-const backArrow = document.getElementById('back-arrow');
-const viewport  = document.getElementById('viewport');  // ← ADD THIS LINE
+    const stage     = document.getElementById('stage');
+    const wishInput = document.getElementById('wish-input');
+    const backArrow = document.getElementById('back-arrow');
 
-  function fitStage() {
-  const scale = Math.min(
-    window.innerWidth / STAGE_W,
-    window.innerHeight / STAGE_H
-  );
-
-viewport.style.transform = `scale(${scale})`;  }
-
-  const stateMap  = new WeakMap();
-  const autoMap   = new WeakMap();
-  const msgMap    = new WeakMap();
+    const stateMap  = new WeakMap();
+    const autoMap   = new WeakMap();
+    const msgMap    = new WeakMap();
 
     // NEW: keep a reference to every candle wrapper by index
     const allCandles = [];
@@ -503,10 +478,9 @@ window.renderWhisperTraceNearCandle = function (row) {
     }
 
     layoutRowsDepth();
-    fitStage();
 
     window.addEventListener('resize', () => {
-      fitStage();
+      layoutRowsDepth();
     });
 
     // Enter to send wish
@@ -577,7 +551,7 @@ if (typeof window.writeWhisper === 'function' && !Number.isNaN(idx)) {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// -----------------------------------------------------------
+    // -----------------------------------------------------------
 // Whispers: write a whisper row
 // -----------------------------------------------------------
 window.writeWhisper = async function (candleIndex, textRaw) {
@@ -767,7 +741,7 @@ function listenForTraceChanges() {
 
   </script>
 
-<script>
+  <script>
 (function () {
   const canvas = document.getElementById("particleField");
   if (!canvas) return;
@@ -776,8 +750,8 @@ function listenForTraceChanges() {
   let W = 0, H = 0, DPR = 1;
 
   const particles = [];
-  const BASE_COUNT = 520; // slightly higher for Live
-  const SPEED = 1.2;      // slightly more active than Memorial
+  const BASE_COUNT = 800; // adjust later (we can tie to Supabase count)
+  const SPEED = 0.5;      // subtle motion; increase to 1.2–1.5 if too slow
 
   function resize() {
     DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
@@ -796,10 +770,10 @@ function listenForTraceChanges() {
     return {
       x: Math.random() * W,
       y: Math.random() * H,
-      r: 0.6 + Math.random() * 3.5,
-      vx: (-0.06 + Math.random() * 0.05) * SPEED,
-      vy: (-0.10 - Math.random() * 0.05) * SPEED,
-      a: 0.08 + Math.random() * 0.15,
+      r: 0.6 + Math.random() * 5.0,
+      vx: (-0.06 + Math.random() * 0.12) * SPEED,
+      vy: (-0.10 - Math.random() * 0.30) * SPEED, // drift upward
+      a: 0.06 + Math.random() * 0.25,
       phase: Math.random() * Math.PI * 2,
       tw: 0.6 + Math.random() * 1.4
     };
@@ -813,8 +787,9 @@ function listenForTraceChanges() {
   function tick() {
     ctx.clearRect(0, 0, W, H);
 
+    // Soft “embers”
     for (const p of particles) {
-      p.phase += 0.012;
+      p.phase += 0.010;
       const tw = (Math.sin(p.phase) * 0.5 + 0.5) * p.tw;
       const alpha = Math.max(0, Math.min(1, p.a * (0.7 + tw * 0.6)));
 
@@ -824,9 +799,11 @@ function listenForTraceChanges() {
       ctx.fillStyle = "rgba(255,170,90,1)";
       ctx.fill();
 
+      // Update motion
       p.x += p.vx;
       p.y += p.vy;
 
+      // Wrap around edges
       if (p.y < -20) { p.y = H + 20; p.x = Math.random() * W; }
       if (p.x < -20) { p.x = W + 20; }
       if (p.x > W + 20) { p.x = -20; }
