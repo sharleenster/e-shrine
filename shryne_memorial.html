@@ -255,7 +255,7 @@
     const MIN_W         = 100;  // far row
     const MAX_W         = 150;  // near row
 
-    const AUTO_OUT_MS       = 60000;
+    const AUTO_OUT_MS       = 10000;
     const LIGHT_MS          = 3000;
     const OUT_MS            = 2500;
     const MESSAGE_MAX_CHARS = 80;
@@ -902,22 +902,37 @@ const ritualBtn = document.getElementById("lightCandleBtn");
 const ritualImg = document.getElementById("ritualCandleImg");
 
 let hasLit = false;
+let ritualAutoOutTimer = null;
 
 ritualBtn.addEventListener("click", () => {
   if (hasLit) return;
 
   hasLit = true;
 
-  // Swap to lit candle loop
-  ritualImg.src = "assets/images/candle_loop.gif";
-
-  setTimeout(() => {
-  ritualImg.src = "assets/images/static_candle.png";
-  hasLit = false; // allow another lighting later
-}, 10000);
+  // Step 1: light animation
+  ritualImg.src = "assets/images/candle_light.gif";
 
   // Spawn one engaged-visit particle
   spawnEngagedParticle();
+
+  // Step 2: after light animation, switch to looping flame
+  setTimeout(() => {
+    ritualImg.src = "assets/images/candle_loop.gif";
+
+    // Step 3: after burn duration, play out animation
+    ritualAutoOutTimer = setTimeout(() => {
+      ritualImg.src = "assets/images/candle_out.gif";
+
+      // Step 4: after out animation, return to static
+      setTimeout(() => {
+        ritualImg.src = "assets/images/static_candle.png";
+        hasLit = false;
+        ritualAutoOutTimer = null;
+      }, OUT_MS);
+
+    }, AUTO_OUT_MS);
+
+  }, LIGHT_MS);
 });
 
 </script>
