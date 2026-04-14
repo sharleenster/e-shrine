@@ -510,30 +510,26 @@ window.renderWhisperTraceNearCandle = function (row) {
       }
     }
 
-    layoutRowsDepth();
+// layoutRowsDepth();
 
-    window.addEventListener('resize', () => {
-      layoutRowsDepth();
-    });
+// window.addEventListener('resize', () => {
+//   layoutRowsDepth();
+// });
 
     // Enter to send wish
-    wishInput.addEventListener('keydown', (e) => {
-      if (e.key !== 'Enter') return;
+  wishInput.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
 
-      const text = (wishInput.value || '').trim();
-      if (!text) return;
-      if (!activeCandle) return;
+  const text = (wishInput.value || '').trim();
+  if (!text) return;
+  if (!hasLit) return;
 
-      const s = stateMap.get(activeCandle);
-      if (s !== 'on') return;
+  if (typeof window.writeWhisper === 'function') {
+    window.writeWhisper(0, text);
+  }
 
-      showMessage(activeCandle, text);
-      const idx = parseInt(activeCandle.dataset.candleIndex, 10);
-if (typeof window.writeWhisper === 'function' && !Number.isNaN(idx)) {
-  window.writeWhisper(idx, text);
-}
-      wishInput.value = '';
-    });
+  wishInput.value = '';
+});
 
     // Back arrow → entry page
     if (backArrow) {
@@ -908,6 +904,7 @@ ritualBtn.addEventListener("click", () => {
   if (hasLit) return;
 
   hasLit = true;
+  enableInputForActive();
 
   // Step 1: light animation
   ritualImg.src = "assets/images/candle_light.gif";
@@ -923,12 +920,13 @@ ritualBtn.addEventListener("click", () => {
     ritualAutoOutTimer = setTimeout(() => {
       ritualImg.src = "assets/images/candle_out.gif";
 
-      // Step 4: after out animation, return to static
-      setTimeout(() => {
-        ritualImg.src = "assets/images/static_candle.png";
-        hasLit = false;
-        ritualAutoOutTimer = null;
-      }, OUT_MS);
+    // Step 4: after out animation, return to static
+    setTimeout(() => {
+    ritualImg.src = "assets/images/static_candle.png";
+    hasLit = false;
+    ritualAutoOutTimer = null;
+    resetInputToIdle();
+    }, OUT_MS);
 
     }, AUTO_OUT_MS);
 
