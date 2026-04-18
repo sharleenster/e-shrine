@@ -223,7 +223,7 @@
       });
     }
 
-    function setupDesktopLink() {
+ function setupDesktopLink() {
   function goTo(target) {
     const page = target || DEFAULT_PAGE;
     document.body.style.transition = 'opacity 0.9s ease';
@@ -233,24 +233,16 @@
     }, 900);
   }
 
-  // click the specific option
+  // click the specific option (single listener only)
   desktopBar.addEventListener('click', (e) => {
     const link = e.target.closest('.entry-link');
-    if (link) {
-    desktopBar.addEventListener('click', (e) => {
-  const link = e.target.closest('.entry-link');
-  if (!link) return;
+    if (!link) return;
 
-  const target = link.dataset.target;
-
-
-  // Memorial → normal navigation with your existing fade
-  goTo(target);
-});
-    }
+    const target = link.dataset.target;
+    goTo(target);
   });
 
-  // keyboard: Enter = default (or focused link, if you later make them buttons)
+  // keyboard support
   desktopBar.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
