@@ -528,6 +528,10 @@ window.renderWhisperTraceNearCandle = function (row) {
     window.writeWhisper(0, text);
   }
 
+  if (typeof window.spawnEngagedParticle === 'function') {
+  window.spawnEngagedParticle();
+}
+
   wishInput.value = '';
 });
 
@@ -910,7 +914,7 @@ ritualBtn.addEventListener("click", () => {
   ritualImg.src = "assets/images/candle_light.gif";
 
   // Spawn one engaged-visit particle
-  spawnEngagedParticle();
+// spawnEngagedParticle();
 
   // Step 2: after light animation, switch to looping flame
   setTimeout(() => {
