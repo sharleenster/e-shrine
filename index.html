@@ -215,13 +215,12 @@
     const entryCandle = document.getElementById('entry-candle');
     const desktopBar  = document.getElementById('desktop-bar');
 
-    function fadeInBody() {
-      window.addEventListener('load', () => {
-        document.body.classList.add('ready');
-        // mark as desktop for flicker; harmless on mobile
-        document.body.classList.add('desktop');
-      });
-    }
+function fadeInBody() {
+  document.addEventListener('DOMContentLoaded', () => {
+    document.body.classList.add('ready');
+    document.body.classList.add('desktop');
+  });
+}
 
  function setupDesktopLink() {
   function goTo(target) {
