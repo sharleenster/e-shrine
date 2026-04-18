@@ -863,8 +863,10 @@ function listenForTraceChanges() {
     const p = makeParticle();
 
     // Spawn near center-bottom (ritual zone)
-    p.x = window.innerWidth / 2 + (Math.random() - 0.5) * 40;
-    p.y = window.innerHeight - 220 + (Math.random() - 0.5) * 30;
+const rect = ritualImg.getBoundingClientRect();
+
+p.x = rect.left + rect.width / 2 + (Math.random() - 0.5) * 22;
+p.y = rect.top + 55 + (Math.random() - 0.5) * 10;
 
     // Temporarily more noticeable than background particles
     p.r = 20;      // consistent, clearly larger
