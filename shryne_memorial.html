@@ -910,7 +910,6 @@ ritualBtn.addEventListener("click", () => {
   if (hasLit) return;
 
   hasLit = true;
-  enableInputForActive();
 
   // Step 1: light animation
   ritualImg.src = "assets/images/candle_light.gif";
@@ -919,11 +918,12 @@ ritualBtn.addEventListener("click", () => {
 // spawnEngagedParticle();
 
   // Step 2: after light animation, switch to looping flame
-  setTimeout(() => {
-    ritualImg.src = "assets/images/candle_loop.gif";
+setTimeout(() => {
+  ritualImg.src = "assets/images/candle_loop.gif";
+  enableInputForActive();
 
-    // Step 3: after burn duration, play out animation
-    ritualAutoOutTimer = setTimeout(() => {
+  // Step 3: after burn duration, play out animation
+  ritualAutoOutTimer = setTimeout(() => {
       ritualImg.src = "assets/images/candle_out.gif";
 
     // Step 4: after out animation, return to static
