@@ -869,7 +869,7 @@ p.x = rect.left + rect.width / 2 + (Math.random() - 0.5) * 22;
 p.y = rect.top + 55 + (Math.random() - 0.5) * 10;
 
     // Temporarily more noticeable than background particles
-    p.r = 20;      // consistent, clearly larger
+    p.r = 10 + Math.random() * 4;     // consistent, clearly larger
     p.a = 0.95;    // consistent, clearly brighter
     p.vy = (-0.65) * SPEED;
 
