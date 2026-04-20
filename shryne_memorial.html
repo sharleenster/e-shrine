@@ -879,24 +879,7 @@ p.y = rect.top + 55 + (Math.random() - 0.5) * 10;
 
 })();
 
-function spawnEngagedParticle(){
-  // Create a particle using the same schema as the existing system
-  const p = makeParticle();
 
-  // Spawn near the ritual candle area (center-bottom-ish)
-  p.x = window.innerWidth / 2 + (Math.random() - 0.5) * 40;
-  p.y = window.innerHeight - 220 + (Math.random() - 0.5) * 30;
-
-  // Make it temporarily more noticeable
-  p.r = 6 + Math.random() * 4;          // bigger than normal
-  p.a = 0.35 + Math.random() * 0.25;    // brighter than normal
-  p.vy = (-0.35 - Math.random() * 0.35) * SPEED;
-
-  // Tag it so we can let it "cool down" into the field
-  p.birthFrames = 180; // ~3 seconds at 60fps
-
-  particles.push(p);
-}
 
 // --- Layer 1: Ritual click → particle creation ---
 
