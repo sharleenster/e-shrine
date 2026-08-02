@@ -26,7 +26,7 @@
       width: 100vw;
       height: 100vh;
       z-index: 0;
-      pointer-events: none;
+      pointer-events: auto;
     background: transparent;
     }
 
@@ -651,6 +651,29 @@ window.writeWhisper = async function (candleIndex, textRaw) {
       }
     };
 
+// -----------------------------------------------------------
+// Read existing whispers from Supabase
+// -----------------------------------------------------------
+window.readWhispers = async function () {
+  const { data, error } = await supabase
+    .from('whispers')
+    .select('*');
+
+  if (error) {
+    console.error('❌ Whisper read failed:', error.message);
+    return;
+  }
+
+  console.log('✅ Existing whispers:', data);
+  console.table(data);
+  if (data.length > 0 && typeof window.spawnEngagedParticle === 'function') {
+  window.spawnEngagedParticle(data[0]);
+  console.log('✨ Test particle created from:', data[0]);
+}
+};
+
+window.readWhispers();
+
     // -----------------------------------------------------------
     // Tiny connection test
     // -----------------------------------------------------------
@@ -780,7 +803,8 @@ function listenForTraceChanges() {
 
   </script>
 
-  <script>
+
+<script>
 (function () {
   const canvas = document.getElementById("particleField");
   if (!canvas) return;
@@ -818,6 +842,25 @@ function listenForTraceChanges() {
     };
   }
 
+window.addEventListener("click", (event) => {
+  console.log("Canvas click detected");
+
+  const rect = canvas.getBoundingClientRect();
+  const clickX = event.clientX - rect.left;
+  const clickY = event.clientY - rect.top;
+
+  const clickedParticle = particles.find((p) => {
+    if (!p.whisperRecord) return false;
+
+    const distance = Math.hypot(clickX - p.x, clickY - p.y);
+    return distance <= Math.max(p.r + 8, 14);
+  });
+
+  if (clickedParticle) {
+    alert(clickedParticle.whisperRecord.text_raw);
+  }
+});
+
   function ensureCount(n) {
     while (particles.length < n) particles.push(makeParticle());
     while (particles.length > n) particles.pop();
@@ -844,6 +887,13 @@ function listenForTraceChanges() {
       ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
       ctx.fillStyle = "rgba(255,170,90,1)";
       ctx.fill();
+      
+      // Identify particles carrying real whisper data
+      if (p.whisperRecord) {
+      ctx.strokeStyle = "rgba(255,220,160,0.95)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+}
 
       // Update motion
       p.x += p.vx;
@@ -865,8 +915,9 @@ function listenForTraceChanges() {
   requestAnimationFrame(tick);
 
   // Layer 1 hook: allow candle click to spawn an engaged-visit particle
-  window.spawnEngagedParticle = function () {
-    const p = makeParticle();
+ window.spawnEngagedParticle = function (whisperRecord = null) {
+  const p = makeParticle();
+  p.whisperRecord = whisperRecord;
 
     // Spawn near center-bottom (ritual zone)
 const rect = ritualImg.getBoundingClientRect();
