@@ -30,6 +30,24 @@
     background: transparent;
     }
 
+    #whisperReveal {
+  position: fixed;
+  left: 50%;
+  top: 32%;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+  max-width: 520px;
+  padding: 20px;
+  color: rgba(255, 235, 215, 0.95);
+  font-size: 22px;
+  line-height: 1.5;
+  text-align: center;
+  text-shadow: 0 0 14px rgba(255, 170, 90, 0.7);
+  opacity: 0;
+  transition: opacity 0.8s ease;
+  pointer-events: none;
+}
+
     .candle-wrap {
       position: absolute;
       display: inline-block;
@@ -210,7 +228,7 @@
 </head>
 <body>
   <canvas id="particleField" aria-hidden="true"></canvas>
-  
+  <div id="whisperReveal" aria-live="polite"></div>
 <div id="stage"></div>
 
 <div id="ritual">
@@ -857,7 +875,9 @@ window.addEventListener("click", (event) => {
   });
 
   if (clickedParticle) {
-    alert(clickedParticle.whisperRecord.text_raw);
+    const reveal = document.getElementById("whisperReveal");
+    reveal.textContent = clickedParticle.whisperRecord.text_raw;
+    reveal.style.opacity = "1";
   }
 });
 
