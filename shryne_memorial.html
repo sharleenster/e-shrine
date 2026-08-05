@@ -382,7 +382,7 @@ window.renderWhisperTraceNearCandle = function (row) {
 function enableInputForActive() {
   wishInput.disabled = false;
   wishInput.value = '';
-  wishInput.placeholder = 'Type your whisper and press Enter to send.';
+  wishInput.placeholder = 'What would you like to place in the light?';
 
   wishInput.addEventListener('focus', () => {
     wishInput.placeholder = '';
@@ -831,6 +831,10 @@ function listenForTraceChanges() {
   let W = 0, H = 0, DPR = 1;
 
   const particles = [];
+  let revealedParticle = null;
+  let revealStartedAt = 0;
+  const REVEAL_DURATION_MS = 5000;
+
   const BASE_COUNT = 800; // adjust later (we can tie to Supabase count)
   const SPEED = 0.5;      // subtle motion; increase to 1.2–1.5 if too slow
 
@@ -874,10 +878,13 @@ window.addEventListener("click", (event) => {
     return distance <= Math.max(p.r + 8, 14);
   });
 
-  if (clickedParticle) {
-    const reveal = document.getElementById("whisperReveal");
-    reveal.textContent = clickedParticle.whisperRecord.text_raw;
-    reveal.style.opacity = "1";
+ if (clickedParticle) {
+  const reveal = document.getElementById("whisperReveal");
+  reveal.textContent = clickedParticle.whisperRecord.text_raw;
+  reveal.style.opacity = "1";
+
+  revealedParticle = clickedParticle;
+  revealStartedAt = performance.now();
   }
 });
 
@@ -919,22 +926,44 @@ window.addEventListener("click", (event) => {
       p.x += p.vx;
       p.y += p.vy;
 
+      
       // Wrap around edges
       if (p.y < -20) { p.y = H + 20; p.x = Math.random() * W; }
       if (p.x < -20) { p.x = W + 20; }
       if (p.x > W + 20) { p.x = -20; }
     }
 
-    ctx.globalAlpha = 1;
-    requestAnimationFrame(tick);
-  }
+    if (revealedParticle) {
+      const reveal = document.getElementById("whisperReveal");
+      const elapsed = performance.now() - revealStartedAt;
+      const fadeBeginsAt = 2000;
 
-  window.addEventListener("resize", resize);
-  resize();
-  ensureCount(BASE_COUNT);
-  requestAnimationFrame(tick);
+      reveal.style.left = revealedParticle.x + "px";
+      reveal.style.top = (revealedParticle.y - 35) + "px";
 
-  // Layer 1 hook: allow candle click to spawn an engaged-visit particle
+      if (elapsed >= REVEAL_DURATION_MS) {
+        reveal.style.opacity = "0";
+        revealedParticle = null;
+      } else if (elapsed > fadeBeginsAt) {
+        const fadeProgress =
+          (elapsed - fadeBeginsAt) / (REVEAL_DURATION_MS - fadeBeginsAt);
+
+        reveal.style.opacity = String(1 - fadeProgress);
+      }
+    }
+
+ctx.globalAlpha = 1;
+requestAnimationFrame(tick);
+}
+
+window.addEventListener("resize", resize);
+resize();
+ensureCount(BASE_COUNT);
+requestAnimationFrame(tick);
+
+// Layer 1 hook: allow candle click to spawn an engaged-visit particle
+
+// Layer 1 hook: allow candle click to spawn an engaged-visit particle
  window.spawnEngagedParticle = function (whisperRecord = null) {
   const p = makeParticle();
   p.whisperRecord = whisperRecord;
