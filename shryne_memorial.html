@@ -538,19 +538,21 @@ function enableInputForActive() {
 // });
 
     // Enter to send wish
-  wishInput.addEventListener('keydown', (e) => {
+  wishInput.addEventListener('keydown', async (e) => {
   if (e.key !== 'Enter') return;
 
   const text = (wishInput.value || '').trim();
   if (!text) return;
   if (!hasLit) return;
 
-  if (typeof window.writeWhisper === 'function') {
-    window.writeWhisper(0, text);
-  }
+  let whisperRecord = null;
 
-if (typeof window.spawnEngagedParticle === 'function') {
-  window.spawnEngagedParticle();
+if (typeof window.writeWhisper === 'function') {
+  whisperRecord = await window.writeWhisper(0, text);
+}
+
+if (whisperRecord && typeof window.spawnEngagedParticle === 'function') {
+  window.spawnEngagedParticle(whisperRecord);
 }
 
 wishInput.value = '';
@@ -628,19 +630,23 @@ window.writeWhisper = async function (candleIndex, textRaw) {
     };
 
 
-    const { error } = await supabase
-      .from('whispers')
-      .insert({
-        candle_id: `candle_${String(candleIndex).padStart(2, '0')}`,
-        text_raw: raw,
-        trace_public: trace
-      });
+    const { data, error } = await supabase
+    .from('whispers')
+    .insert({
+    candle_id: `candle_${String(candleIndex).padStart(2, '0')}`,
+    text_raw: raw,
+    trace_public: trace
+    })
+   .select()
+    .single();
 
-    if (error) {
-      console.error('❌ Whisper insert failed:', error.message);
-    } else {
-      console.log('✅ Whisper inserted');
-    }
+if (error) {
+  console.error('❌ Whisper insert failed:', error.message);
+  return null;
+} else {
+  console.log('✅ Whisper inserted:', data);
+  return data;
+}
   } catch (err) {
     console.error('❌ Whisper insert exception:', err);
   }
