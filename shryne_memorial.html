@@ -694,6 +694,11 @@ window.readWhispers = async function () {
 
   console.log('✅ Existing whispers:', data);
   console.table(data);
+  if (Array.isArray(data) && typeof window.spawnEngagedParticle === 'function') {
+    data.forEach((whisperRecord) => {
+      window.spawnEngagedParticle(whisperRecord);
+    });
+  }
 };
 
 window.readWhispers();
