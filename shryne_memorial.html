@@ -552,7 +552,11 @@ if (typeof window.writeWhisper === 'function') {
 }
 
 if (whisperRecord && typeof window.spawnEngagedParticle === 'function') {
-  window.spawnEngagedParticle(whisperRecord);
+  const particle = window.spawnEngagedParticle(whisperRecord);
+
+  if (particle && typeof window.revealWhisperParticle === 'function') {
+    window.revealWhisperParticle(particle);
+  }
 }
 
 wishInput.value = '';
@@ -690,10 +694,6 @@ window.readWhispers = async function () {
 
   console.log('✅ Existing whispers:', data);
   console.table(data);
-  if (data.length > 0 && typeof window.spawnEngagedParticle === 'function') {
-  window.spawnEngagedParticle(data[0]);
-  console.log('✨ Test particle created from:', data[0]);
-}
 };
 
 window.readWhispers();
@@ -966,7 +966,6 @@ resize();
 ensureCount(BASE_COUNT);
 requestAnimationFrame(tick);
 
-// Layer 1 hook: allow candle click to spawn an engaged-visit particle
 
 // Layer 1 hook: allow candle click to spawn an engaged-visit particle
  window.spawnEngagedParticle = function (whisperRecord = null) {
@@ -986,10 +985,23 @@ p.y = rect.top + 55 + (Math.random() - 0.5) * 10;
 
     p.birthFrames = 180; // ~3 seconds at 60fps
     particles.push(p);
-  };
+return p;
+};
+
+window.revealWhisperParticle = function (particle) {
+  if (!particle || !particle.whisperRecord) return;
+
+  const reveal = document.getElementById("whisperReveal");
+  if (!reveal) return;
+
+  reveal.textContent = particle.whisperRecord.text_raw || "";
+  reveal.style.opacity = "1";
+
+  revealedParticle = particle;
+  revealStartedAt = performance.now();
+};
 
 })();
-
 
 
 // --- Layer 1: Ritual click → particle creation ---
@@ -1007,9 +1019,6 @@ ritualBtn.addEventListener("click", () => {
 
   // Step 1: light animation
   ritualImg.src = "assets/images/candle_light.gif";
-
-  // Spawn one engaged-visit particle
-// spawnEngagedParticle();
 
   // Step 2: after light animation, switch to looping flame
 setTimeout(() => {
