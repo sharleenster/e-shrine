@@ -694,9 +694,9 @@ window.readWhispers = async function () {
 
   console.log('✅ Existing whispers:', data);
   console.table(data);
-  if (Array.isArray(data) && typeof window.spawnEngagedParticle === 'function') {
+  if (Array.isArray(data) && typeof window.spawnHistoricalParticle === 'function') {
     data.forEach((whisperRecord) => {
-      window.spawnEngagedParticle(whisperRecord);
+      window.spawnHistoricalParticle(whisperRecord);
     });
   }
 };
@@ -891,6 +891,7 @@ window.addEventListener("click", (event) => {
  if (clickedParticle) {
   const reveal = document.getElementById("whisperReveal");
   reveal.textContent = clickedParticle.whisperRecord.text_raw;
+  reveal.style.filter = clickedParticle.kind === "historical" ? "blur(7px)" : "none";
   reveal.style.opacity = "1";
 
   revealedParticle = clickedParticle;
@@ -972,6 +973,39 @@ ensureCount(BASE_COUNT);
 requestAnimationFrame(tick);
 
 
+window.spawnHistoricalParticle = function (whisperRecord) {
+  const p = makeParticle();
+  p.whisperRecord = whisperRecord;
+  p.kind = "historical";
+  p.r = 6 + Math.random() * 3;
+  p.a = 0.4 + Math.random() * 0.25;
+
+  const ritualRect = document.getElementById("ritual").getBoundingClientRect();
+  const inputRect = document.getElementById("bottom-bar").getBoundingClientRect();
+  const padding = 60;
+
+  function isProtected(x, y, rect) {
+    return x >= rect.left - padding &&
+      x <= rect.right + padding &&
+      y >= rect.top - padding &&
+      y <= rect.bottom + padding;
+  }
+
+  for (let attempts = 0; attempts < 100; attempts++) {
+    const x = Math.random() * W;
+    const y = Math.random() * H;
+
+    if (!isProtected(x, y, ritualRect) && !isProtected(x, y, inputRect)) {
+      p.x = x;
+      p.y = y;
+      break;
+    }
+  }
+
+  particles.push(p);
+  return p;
+};
+
 // Layer 1 hook: allow candle click to spawn an engaged-visit particle
  window.spawnEngagedParticle = function (whisperRecord = null) {
   const p = makeParticle();
@@ -1000,6 +1034,7 @@ window.revealWhisperParticle = function (particle) {
   if (!reveal) return;
 
   reveal.textContent = particle.whisperRecord.text_raw || "";
+  reveal.style.filter = "none";
   reveal.style.opacity = "1";
 
   revealedParticle = particle;
